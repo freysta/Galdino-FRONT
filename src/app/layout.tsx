@@ -6,10 +6,11 @@ import {
 } from "@mantine/core";
 import theme from "./theme";
 import "./globals.css";
+import '@mantine/core/styles.css';
 
 export const metadata: Metadata = {
-  title: "Next App Mantine Tailwind Template",
-  description: "Next App Mantine Tailwind Template",
+  title: "InterUniBus - Sistema de Transporte Universitário",
+  description: "Sistema de gerenciamento de transporte universitário",
 };
 
 export default function RootLayout({
@@ -18,12 +19,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" {...mantineHtmlProps}>
+    <html lang="pt-BR" {...mantineHtmlProps}>
       <head>
         <ColorSchemeScript />
       </head>
       <body className="antialiased">
-        <MantineProvider theme={theme}>{children}</MantineProvider>
+        <MantineProvider theme={theme}>
+          {children}
+        </MantineProvider>
       </body>
     </html>
   );
