@@ -1,17 +1,6 @@
-'use client';
+"use client";
 
-import Layout from '@/components/Layout';
-import {
-  IconDashboard,
-  IconClipboardCheck,
-  IconHistory,
-} from '@tabler/icons-react';
-
-const motoristaNavigation = [
-  { label: 'Dashboard', href: '/motorista/dashboard', icon: IconDashboard },
-  { label: 'Confirmar Presença', href: '/motorista/presencas', icon: IconClipboardCheck },
-  { label: 'Histórico de Rotas', href: '/motorista/historico', icon: IconHistory },
-];
+import ModernSidebar from "@/components/ModernSidebar";
 
 export default function MotoristaLayout({
   children,
@@ -19,12 +8,9 @@ export default function MotoristaLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Layout 
-      navigation={motoristaNavigation} 
-      userType="motorista" 
-      userName="Carlos Santos"
-    >
-      {children}
-    </Layout>
+    <div className="flex min-h-screen bg-gray-50">
+      <ModernSidebar userType="motorista" />
+      <main className="flex-1 p-8 bg-white">{children}</main>
+    </div>
   );
 }

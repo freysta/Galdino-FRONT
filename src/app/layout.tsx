@@ -6,11 +6,10 @@ import {
 } from "@mantine/core";
 import theme from "./theme";
 import "./globals.css";
-import '@mantine/core/styles.css';
 
 export const metadata: Metadata = {
-  title: "InterUniBus - Sistema de Transporte Universitário",
-  description: "Sistema de gerenciamento de transporte universitário",
+  title: "Galdino - Sistema de Transporte",
+  description: "Sistema de Transporte Universitário Galdino",
 };
 
 export default function RootLayout({
@@ -24,9 +23,7 @@ export default function RootLayout({
         <ColorSchemeScript />
       </head>
       <body className="antialiased">
-        <MantineProvider theme={theme}>
-          {children}
-        </MantineProvider>
+        <MantineProvider theme={theme}>{children}</MantineProvider>
       </body>
     </html>
   );

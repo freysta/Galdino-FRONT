@@ -1,19 +1,6 @@
-'use client';
+"use client";
 
-import Layout from '@/components/Layout';
-import {
-  IconRoute,
-  IconCreditCard,
-  IconBell,
-  IconUser,
-} from '@tabler/icons-react';
-
-const alunoNavigation = [
-  { label: 'Minhas Rotas', href: '/aluno/rotas', icon: IconRoute },
-  { label: 'Pagamentos', href: '/aluno/pagamentos', icon: IconCreditCard },
-  { label: 'Notificações', href: '/aluno/notificacoes', icon: IconBell },
-  { label: 'Perfil', href: '/aluno/perfil', icon: IconUser },
-];
+import ModernSidebar from "@/components/ModernSidebar";
 
 export default function AlunoLayout({
   children,
@@ -21,12 +8,9 @@ export default function AlunoLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Layout 
-      navigation={alunoNavigation} 
-      userType="aluno" 
-      userName="Ana Silva Santos"
-    >
-      {children}
-    </Layout>
+    <div className="flex min-h-screen bg-gray-50">
+      <ModernSidebar userType="aluno" />
+      <main className="flex-1 p-8 bg-white">{children}</main>
+    </div>
   );
 }

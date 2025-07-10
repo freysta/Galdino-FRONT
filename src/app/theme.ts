@@ -1,6 +1,7 @@
 import { createTheme } from "@mantine/core";
 
 const theme = createTheme({
+  primaryColor: "green",
   breakpoints: {
     xs: "36em",
     sm: "48em",
@@ -9,18 +10,53 @@ const theme = createTheme({
     xl: "88em",
   },
   colors: {
-    brand: [
-      "#e6f7ff",
-      "#bae7ff",
-      "#91d5ff",
-      "#69c0ff",
-      "#40a9ff",
-      "#1890ff",
-      "#096dd9",
-      "#0050b3",
-      "#003a8c",
-      "#002766",
+    green: [
+      "#f0fdf4",
+      "#dcfce7",
+      "#bbf7d0",
+      "#86efac",
+      "#4ade80",
+      "#22c55e",
+      "#16a34a",
+      "#15803d",
+      "#166534",
+      "#14532d",
     ],
+    brand: [
+      "#f0fdf4",
+      "#dcfce7",
+      "#bbf7d0",
+      "#86efac",
+      "#4ade80",
+      "#22c55e",
+      "#16a34a",
+      "#15803d",
+      "#166534",
+      "#14532d",
+    ],
+  },
+  fontFamily: "Inter, system-ui, sans-serif",
+  headings: {
+    fontFamily: "Inter, system-ui, sans-serif",
+    fontWeight: "600",
+  },
+  components: {
+    Button: {
+      defaultProps: {
+        radius: "md",
+      },
+    },
+    Card: {
+      defaultProps: {
+        radius: "lg",
+        shadow: "sm",
+      },
+    },
+    Paper: {
+      defaultProps: {
+        radius: "lg",
+      },
+    },
   },
 });
 

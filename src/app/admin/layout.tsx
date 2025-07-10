@@ -1,25 +1,6 @@
-'use client';
+"use client";
 
-import Layout from '@/components/Layout';
-import {
-  IconDashboard,
-  IconUsers,
-  IconCar,
-  IconRoute,
-  IconMapPin,
-  IconCreditCard,
-  IconBell,
-} from '@tabler/icons-react';
-
-const adminNavigation = [
-  { label: 'Dashboard', href: '/admin/dashboard', icon: IconDashboard },
-  { label: 'Alunos', href: '/admin/alunos', icon: IconUsers },
-  { label: 'Motoristas', href: '/admin/motoristas', icon: IconCar },
-  { label: 'Rotas', href: '/admin/rotas', icon: IconRoute },
-  { label: 'Pontos de Embarque', href: '/admin/pontos', icon: IconMapPin },
-  { label: 'Pagamentos', href: '/admin/pagamentos', icon: IconCreditCard },
-  { label: 'Notificações', href: '/admin/notificacoes', icon: IconBell },
-];
+import ModernSidebar from "@/components/ModernSidebar";
 
 export default function AdminLayout({
   children,
@@ -27,12 +8,9 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Layout 
-      navigation={adminNavigation} 
-      userType="admin" 
-      userName="Admin Sistema"
-    >
-      {children}
-    </Layout>
+    <div className="flex min-h-screen bg-gray-50">
+      <ModernSidebar userType="admin" />
+      <main className="flex-1 p-8 bg-white">{children}</main>
+    </div>
   );
 }
