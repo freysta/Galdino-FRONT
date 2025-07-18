@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Title,
   Button,
@@ -19,8 +19,8 @@ import {
   Menu,
   Alert,
   Textarea,
-} from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+} from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
 import {
   IconPlus,
   IconSearch,
@@ -32,119 +32,94 @@ import {
   IconAlertCircle,
   IconBuilding,
   IconRoad,
-} from '@tabler/icons-react';
+} from "@tabler/icons-react";
 
-// Mock data
-const mockBoardingPoints = [
-  {
-    id: 1,
-    name: 'Terminal Rodoviário Central',
-    city: 'São Paulo',
-    street: 'Rua do Terminal, 123',
-    neighborhood: 'Centro',
-    reference: 'Próximo ao Shopping Center',
-    status: 'active',
-    routes: ['Campus Norte', 'Campus Sul'],
-    capacity: 50,
-  },
-  {
-    id: 2,
-    name: 'Shopping Center Norte',
-    city: 'São Paulo',
-    street: 'Av. das Nações, 456',
-    neighborhood: 'Vila Norte',
-    reference: 'Em frente ao McDonald\'s',
-    status: 'active',
-    routes: ['Campus Norte'],
-    capacity: 30,
-  },
-  {
-    id: 3,
-    name: 'Estação Metrô Santana',
-    city: 'São Paulo',
-    street: 'Praça Santana, s/n',
-    neighborhood: 'Santana',
-    reference: 'Saída B do metrô',
-    status: 'active',
-    routes: ['Centro'],
-    capacity: 25,
-  },
-  {
-    id: 4,
-    name: 'Praça da Sé',
-    city: 'São Paulo',
-    street: 'Praça da Sé, s/n',
-    neighborhood: 'Sé',
-    reference: 'Próximo à Catedral',
-    status: 'inactive',
-    routes: ['Campus Sul'],
-    capacity: 40,
-  },
-  {
-    id: 5,
-    name: 'Terminal Tietê',
-    city: 'São Paulo',
-    street: 'Av. Cruzeiro do Sul, 1800',
-    neighborhood: 'Santana',
-    reference: 'Portão 3',
-    status: 'active',
-    routes: ['Centro', 'Campus Norte'],
-    capacity: 60,
-  },
-];
+import {
+  useBoardingPoints,
+  useApiOperations,
+  apiOperations,
+} from "@/hooks/useApiData";
+import { BoardingPoint } from "@/services/api";
 
 export default function PontosPage() {
   const [opened, { open, close }] = useDisclosure(false);
-  const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false);
-  const [boardingPoints, setBoardingPoints] = useState(mockBoardingPoints);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [
+    deleteModalOpened,
+    { open: openDeleteModal, close: closeDeleteModal },
+  ] = useDisclosure(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [editingPoint, setEditingPoint] = useState<any>(null);
-  const [pointToDelete, setPointToDelete] = useState<any>(null);
+  const [editingPoint, setEditingPoint] = useState<BoardingPoint | null>(null);
+  const [pointToDelete, setPointToDelete] = useState<BoardingPoint | null>(
+    null,
+  );
+
+  // Usar a API real
+  const { data: boardingPoints, loading, error, refetch } = useBoardingPoints();
+  const { execute, loading: operationLoading } = useApiOperations();
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'green';
-      case 'inactive': return 'red';
-      case 'maintenance': return 'orange';
-      default: return 'gray';
+      case "active":
+        return "green";
+      case "inactive":
+        return "red";
+      case "maintenance":
+        return "orange";
+      default:
+        return "gray";
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'active': return 'Ativo';
-      case 'inactive': return 'Inativo';
-      case 'maintenance': return 'Manutenção';
-      default: return 'Desconhecido';
+      case "active":
+        return "Ativo";
+      case "inactive":
+        return "Inativo";
+      case "maintenance":
+        return "Manutenção";
+      default:
+        return "Desconhecido";
     }
   };
 
-  const filteredPoints = boardingPoints.filter(point => {
-    const matchesSearch = point.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         point.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         point.neighborhood.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         point.street.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredPoints = boardingPoints.filter((point: BoardingPoint) => {
+    const matchesSearch =
+      point.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (point.city &&
+        point.city.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (point.neighborhood &&
+        point.neighborhood.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (point.street &&
+        point.street.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = !statusFilter || point.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const handleEdit = (point: any) => {
+  const handleEdit = (point: BoardingPoint) => {
     setEditingPoint(point);
     open();
   };
 
-  const handleDeleteClick = (point: any) => {
+  const handleDeleteClick = (point: BoardingPoint) => {
     setPointToDelete(point);
     openDeleteModal();
   };
 
-  const handleDeleteConfirm = () => {
-    if (pointToDelete) {
-      setBoardingPoints(boardingPoints.filter(p => p.id !== pointToDelete.id));
-      setPointToDelete(null);
-      closeDeleteModal();
+  const handleDeleteConfirm = async () => {
+    if (pointToDelete?.id) {
+      try {
+        await execute(() =>
+          apiOperations.boardingPoints.delete(pointToDelete.id!),
+        );
+        setPointToDelete(null);
+        closeDeleteModal();
+        refetch();
+      } catch (error) {
+        alert("Erro ao excluir ponto de embarque");
+      }
     }
   };
 
@@ -156,7 +131,10 @@ export default function PontosPage() {
   const itemsPerPage = 10;
   const totalPages = Math.ceil(filteredPoints.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedPoints = filteredPoints.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedPoints = filteredPoints.slice(
+    startIndex,
+    startIndex + itemsPerPage,
+  );
 
   return (
     <Stack gap="lg">
@@ -182,9 +160,9 @@ export default function PontosPage() {
             <Select
               placeholder="Status"
               data={[
-                { value: 'active', label: 'Ativo' },
-                { value: 'inactive', label: 'Inativo' },
-                { value: 'maintenance', label: 'Manutenção' },
+                { value: "active", label: "Ativo" },
+                { value: "inactive", label: "Inativo" },
+                { value: "maintenance", label: "Manutenção" },
               ]}
               value={statusFilter}
               onChange={setStatusFilter}
@@ -240,19 +218,28 @@ export default function PontosPage() {
                 </Table.Td>
                 <Table.Td>
                   <Stack gap="xs">
-                    {point.routes.map((route, index) => (
-                      <Badge key={index} variant="light" color="blue" size="sm">
-                        {route}
-                      </Badge>
-                    ))}
+                    {point.routes &&
+                      point.routes.map((route: string, index: number) => (
+                        <Badge
+                          key={index}
+                          variant="light"
+                          color="blue"
+                          size="sm"
+                        >
+                          {route}
+                        </Badge>
+                      ))}
                   </Stack>
                 </Table.Td>
                 <Table.Td>
-                  <Text size="sm">{point.capacity} pessoas</Text>
+                  <Text size="sm">{point.capacity || 0} pessoas</Text>
                 </Table.Td>
                 <Table.Td>
-                  <Badge color={getStatusColor(point.status)} variant="light">
-                    {getStatusLabel(point.status)}
+                  <Badge
+                    color={getStatusColor(point.status || "inactive")}
+                    variant="light"
+                  >
+                    {getStatusLabel(point.status || "inactive")}
                   </Badge>
                 </Table.Td>
                 <Table.Td>
@@ -266,15 +253,15 @@ export default function PontosPage() {
                       <Menu.Item leftSection={<IconEye size="0.9rem" />}>
                         Visualizar
                       </Menu.Item>
-                      <Menu.Item 
+                      <Menu.Item
                         leftSection={<IconEdit size="0.9rem" />}
                         onClick={() => handleEdit(point)}
                       >
                         Editar
                       </Menu.Item>
                       <Menu.Divider />
-                      <Menu.Item 
-                        color="red" 
+                      <Menu.Item
+                        color="red"
                         leftSection={<IconTrash size="0.9rem" />}
                         onClick={() => handleDeleteClick(point)}
                       >
@@ -300,7 +287,16 @@ export default function PontosPage() {
       </Card>
 
       {/* Modal de adicionar/editar ponto */}
-      <Modal opened={opened} onClose={close} title={editingPoint ? "Editar Ponto de Embarque" : "Adicionar Ponto de Embarque"} size="lg">
+      <Modal
+        opened={opened}
+        onClose={close}
+        title={
+          editingPoint
+            ? "Editar Ponto de Embarque"
+            : "Adicionar Ponto de Embarque"
+        }
+        size="lg"
+      >
         <Stack gap="md">
           <Grid>
             <Grid.Col span={12}>
@@ -356,9 +352,9 @@ export default function PontosPage() {
                 label="Status"
                 placeholder="Selecione o status"
                 data={[
-                  { value: 'active', label: 'Ativo' },
-                  { value: 'inactive', label: 'Inativo' },
-                  { value: 'maintenance', label: 'Manutenção' },
+                  { value: "active", label: "Ativo" },
+                  { value: "inactive", label: "Inativo" },
+                  { value: "maintenance", label: "Manutenção" },
                 ]}
                 required
                 defaultValue={editingPoint?.status}
@@ -368,32 +364,37 @@ export default function PontosPage() {
               <Textarea
                 label="Rotas que utilizam este ponto"
                 placeholder="Digite as rotas separadas por vírgula (Ex: Campus Norte, Campus Sul)"
-                defaultValue={editingPoint?.routes?.join(', ')}
+                defaultValue={editingPoint?.routes?.join(", ")}
               />
             </Grid.Col>
           </Grid>
-          
+
           <Group justify="flex-end" mt="md">
             <Button variant="light" onClick={close}>
               Cancelar
             </Button>
             <Button onClick={close}>
-              {editingPoint ? 'Salvar' : 'Adicionar'}
+              {editingPoint ? "Salvar" : "Adicionar"}
             </Button>
           </Group>
         </Stack>
       </Modal>
 
       {/* Modal de confirmação de exclusão */}
-      <Modal opened={deleteModalOpened} onClose={closeDeleteModal} title="Confirmar exclusão">
+      <Modal
+        opened={deleteModalOpened}
+        onClose={closeDeleteModal}
+        title="Confirmar exclusão"
+      >
         <Stack gap="md">
           <Alert icon={<IconAlertCircle size="1rem" />} color="red">
             <Text size="sm">
-              Tem certeza que deseja excluir o ponto de embarque <strong>{pointToDelete?.name}</strong>? 
-              Esta ação não pode ser desfeita e pode afetar as rotas que utilizam este ponto.
+              Tem certeza que deseja excluir o ponto de embarque{" "}
+              <strong>{pointToDelete?.name}</strong>? Esta ação não pode ser
+              desfeita e pode afetar as rotas que utilizam este ponto.
             </Text>
           </Alert>
-          
+
           <Group justify="flex-end">
             <Button variant="light" onClick={closeDeleteModal}>
               Cancelar

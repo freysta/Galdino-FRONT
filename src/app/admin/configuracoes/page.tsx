@@ -28,7 +28,7 @@ import {
   IconCamera,
 } from "@tabler/icons-react";
 import { useNotifications } from "@/hooks/useNotifications";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface UserProfileData {
   name: string;

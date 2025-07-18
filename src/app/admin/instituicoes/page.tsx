@@ -39,13 +39,11 @@ import {
 import type { Institution } from "@/services/api";
 
 interface InstitutionForm {
-  name: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  phone: string;
-  email: string;
+  nome: string;
+  cidade: string;
+  endereco?: string;
+  telefone?: string;
+  cep?: string;
 }
 
 export default function InstitutionsPage() {
@@ -60,26 +58,15 @@ export default function InstitutionsPage() {
 
   const form = useForm<InstitutionForm>({
     initialValues: {
-      name: "",
-      address: "",
-      city: "",
-      state: "",
-      zipCode: "",
-      phone: "",
-      email: "",
+      nome: "",
+      cidade: "",
+      endereco: "",
+      telefone: "",
+      cep: "",
     },
     validate: {
-      name: (value) => (!value ? "Nome é obrigatório" : null),
-      address: (value) => (!value ? "Endereço é obrigatório" : null),
-      city: (value) => (!value ? "Cidade é obrigatória" : null),
-      state: (value) => (!value ? "Estado é obrigatório" : null),
-      zipCode: (value) => (!value ? "CEP é obrigatório" : null),
-      phone: (value) => (!value ? "Telefone é obrigatório" : null),
-      email: (value) => {
-        if (!value) return "E-mail é obrigatório";
-        if (!/^\S+@\S+$/.test(value)) return "E-mail inválido";
-        return null;
-      },
+      nome: (value) => (!value ? "Nome é obrigatório" : null),
+      cidade: (value) => (!value ? "Cidade é obrigatória" : null),
     },
   });
 
@@ -116,13 +103,11 @@ export default function InstitutionsPage() {
   const handleEdit = (institution: Institution) => {
     setEditingInstitution(institution);
     form.setValues({
-      name: institution.name,
-      address: institution.address,
-      city: institution.city,
-      state: institution.state,
-      zipCode: institution.zipCode,
-      phone: institution.phone,
-      email: institution.email,
+      nome: institution.nome,
+      cidade: institution.cidade,
+      endereco: institution.endereco || "",
+      telefone: institution.telefone || "",
+      cep: institution.cep || "",
     });
     setOpened(true);
   };
@@ -154,8 +139,8 @@ export default function InstitutionsPage() {
 
   const filteredInstitutions = institutions?.filter(
     (institution) =>
-      institution.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      institution.city.toLowerCase().includes(searchQuery.toLowerCase()),
+      institution.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      institution.cidade.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
@@ -195,8 +180,8 @@ export default function InstitutionsPage() {
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Nome</Table.Th>
-                  <Table.Th>Cidade/Estado</Table.Th>
-                  <Table.Th>Contato</Table.Th>
+                  <Table.Th>Cidade</Table.Th>
+                  <Table.Th>Telefone</Table.Th>
                   <Table.Th style={{ width: 80 }}>Ações</Table.Th>
                 </Table.Tr>
               </Table.Thead>
@@ -207,29 +192,25 @@ export default function InstitutionsPage() {
                       <Group gap="xs">
                         <IconBuilding size={16} />
                         <div>
-                          <Text fw={500}>{institution.name}</Text>
+                          <Text fw={500}>{institution.nome}</Text>
                           <Text size="sm" c="dimmed">
-                            {institution.address}
+                            {institution.endereco || "Endereço não informado"}
                           </Text>
                         </div>
                       </Group>
                     </Table.Td>
                     <Table.Td>
-                      <Text>
-                        {institution.city}/{institution.state}
-                      </Text>
+                      <Text>{institution.cidade}</Text>
                       <Text size="sm" c="dimmed">
-                        CEP: {institution.zipCode}
+                        CEP: {institution.cep || "Não informado"}
                       </Text>
                     </Table.Td>
                     <Table.Td>
                       <Group gap="xs">
                         <IconPhone size={14} />
-                        <Text size="sm">{institution.phone}</Text>
-                      </Group>
-                      <Group gap="xs">
-                        <IconMail size={14} />
-                        <Text size="sm">{institution.email}</Text>
+                        <Text size="sm">
+                          {institution.telefone || "Não informado"}
+                        </Text>
                       </Group>
                     </Table.Td>
                     <Table.Td>
@@ -276,59 +257,35 @@ export default function InstitutionsPage() {
               label="Nome da Instituição"
               placeholder="Ex: Universidade Federal"
               required
-              {...form.getInputProps("name")}
+              {...form.getInputProps("nome")}
+            />
+
+            <TextInput
+              label="Cidade"
+              placeholder="Ex: São Paulo"
+              required
+              {...form.getInputProps("cidade")}
             />
 
             <TextInput
               label="Endereço"
               placeholder="Ex: Rua Principal, 123"
-              required
-              {...form.getInputProps("address")}
+              {...form.getInputProps("endereco")}
             />
-
-            <Grid>
-              <Grid.Col span={6}>
-                <TextInput
-                  label="Cidade"
-                  placeholder="Ex: São Paulo"
-                  required
-                  {...form.getInputProps("city")}
-                />
-              </Grid.Col>
-              <Grid.Col span={3}>
-                <TextInput
-                  label="Estado"
-                  placeholder="Ex: SP"
-                  required
-                  maxLength={2}
-                  {...form.getInputProps("state")}
-                />
-              </Grid.Col>
-              <Grid.Col span={3}>
-                <TextInput
-                  label="CEP"
-                  placeholder="00000-000"
-                  required
-                  {...form.getInputProps("zipCode")}
-                />
-              </Grid.Col>
-            </Grid>
 
             <Grid>
               <Grid.Col span={6}>
                 <TextInput
                   label="Telefone"
                   placeholder="(00) 0000-0000"
-                  required
-                  {...form.getInputProps("phone")}
+                  {...form.getInputProps("telefone")}
                 />
               </Grid.Col>
               <Grid.Col span={6}>
                 <TextInput
-                  label="E-mail"
-                  placeholder="contato@instituicao.edu.br"
-                  required
-                  {...form.getInputProps("email")}
+                  label="CEP"
+                  placeholder="00000-000"
+                  {...form.getInputProps("cep")}
                 />
               </Grid.Col>
             </Grid>

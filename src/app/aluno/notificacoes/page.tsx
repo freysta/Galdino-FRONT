@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Title,
   Group,
@@ -14,7 +14,7 @@ import {
   Select,
   Divider,
   Alert,
-} from '@mantine/core';
+} from "@mantine/core";
 import {
   IconBell,
   IconBellOff,
@@ -24,132 +24,128 @@ import {
   IconInfoCircle,
   IconSettings,
   IconMarkdown,
-} from '@tabler/icons-react';
+} from "@tabler/icons-react";
 
-// Mock data
-const mockNotifications = [
-  {
-    id: 1,
-    title: 'Alteração de horário',
-    message: 'A rota das 7h30 foi alterada para 7h45 devido ao trânsito. Por favor, ajuste seu horário de chegada ao ponto de embarque.',
-    type: 'warning',
-    read: false,
-    createdAt: '2024-01-24T07:00:00',
-    priority: 'high',
-  },
-  {
-    id: 2,
-    title: 'Pagamento confirmado',
-    message: 'Seu pagamento da mensalidade de janeiro foi confirmado. Obrigado!',
-    type: 'success',
-    read: true,
-    createdAt: '2024-01-23T14:30:00',
-    priority: 'normal',
-  },
-  {
-    id: 3,
-    title: 'Lembrete: Mensalidade vencendo',
-    message: 'Sua mensalidade de fevereiro vence em 3 dias (05/02). Não esqueça de efetuar o pagamento.',
-    type: 'info',
-    read: false,
-    createdAt: '2024-01-22T09:00:00',
-    priority: 'normal',
-  },
-  {
-    id: 4,
-    title: 'Nova rota disponível',
-    message: 'Agora temos uma nova rota para o Campus Oeste com saídas às 8h e 14h. Confira os detalhes na seção de rotas.',
-    type: 'info',
-    read: true,
-    createdAt: '2024-01-20T16:45:00',
-    priority: 'low',
-  },
-  {
-    id: 5,
-    title: 'Manutenção programada',
-    message: 'O sistema ficará indisponível no domingo das 2h às 6h para manutenção. Planeje-se!',
-    type: 'warning',
-    read: true,
-    createdAt: '2024-01-18T10:15:00',
-    priority: 'normal',
-  },
-  {
-    id: 6,
-    title: 'Bem-vindo ao InterUniBus!',
-    message: 'Seja bem-vindo ao nosso sistema de transporte universitário. Explore todas as funcionalidades disponíveis.',
-    type: 'success',
-    read: true,
-    createdAt: '2024-01-15T08:00:00',
-    priority: 'low',
-  },
-];
+import {
+  useNotifications,
+  useApiOperations,
+  apiOperations,
+} from "@/hooks/useApiData";
+import { Notification } from "@/services/api";
 
 export default function AlunoNotificacoesPage() {
-  const [notifications, setNotifications] = useState(mockNotifications);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [readFilter, setReadFilter] = useState<string | null>(null);
 
+  // Usar a API real
+  const { data: notifications, loading, refetch } = useNotifications();
+  const { execute, loading: operationLoading } = useApiOperations();
+
+  // Filtrar notificações para o aluno (simulado - pode ser expandido com filtro por usuário)
+  const studentNotifications =
+    notifications?.filter(
+      (notification: Notification) =>
+        notification.recipient === "Aluno" ||
+        notification.recipient === "Todos" ||
+        !notification.recipient,
+    ) || [];
+
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'success': return 'green';
-      case 'warning': return 'orange';
-      case 'error': return 'red';
-      case 'info': return 'blue';
-      default: return 'gray';
+      case "success":
+        return "green";
+      case "warning":
+        return "orange";
+      case "error":
+        return "red";
+      case "info":
+        return "blue";
+      default:
+        return "gray";
     }
   };
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'success': return <IconCheck size="1rem" />;
-      case 'warning': return <IconAlertCircle size="1rem" />;
-      case 'error': return <IconAlertCircle size="1rem" />;
-      case 'info': return <IconInfoCircle size="1rem" />;
-      default: return <IconBell size="1rem" />;
+      case "success":
+        return <IconCheck size="1rem" />;
+      case "warning":
+        return <IconAlertCircle size="1rem" />;
+      case "error":
+        return <IconAlertCircle size="1rem" />;
+      case "info":
+        return <IconInfoCircle size="1rem" />;
+      default:
+        return <IconBell size="1rem" />;
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'red';
-      case 'normal': return 'blue';
-      case 'low': return 'gray';
-      default: return 'gray';
+      case "Alta":
+        return "red";
+      case "Normal":
+        return "blue";
+      case "Baixa":
+        return "gray";
+      default:
+        return "gray";
     }
   };
 
-  const getPriorityLabel = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'Alta';
-      case 'normal': return 'Normal';
-      case 'low': return 'Baixa';
-      default: return 'Normal';
+  const filteredNotifications = studentNotifications.filter(
+    (notification: Notification) => {
+      const matchesType = !typeFilter || notification.type === typeFilter;
+      const matchesRead =
+        !readFilter ||
+        (readFilter === "read" && notification.isRead) ||
+        (readFilter === "unread" && !notification.isRead);
+      return matchesType && matchesRead;
+    },
+  );
+
+  const handleMarkAsRead = async (notificationId: number) => {
+    try {
+      await execute(() =>
+        apiOperations.notifications.markAsRead(notificationId),
+      );
+      refetch();
+    } catch (error) {
+      console.error("Erro ao marcar notificação como lida:", error);
     }
   };
 
-  const filteredNotifications = notifications.filter(notification => {
-    const matchesType = !typeFilter || notification.type === typeFilter;
-    const matchesRead = !readFilter || 
-      (readFilter === 'read' && notification.read) ||
-      (readFilter === 'unread' && !notification.read);
-    return matchesType && matchesRead;
-  });
-
-  const handleMarkAsRead = (notificationId: number) => {
-    setNotifications(notifications.map(n => 
-      n.id === notificationId ? { ...n, read: true } : n
-    ));
+  const handleMarkAllAsRead = async () => {
+    try {
+      const unreadNotifications = studentNotifications.filter(
+        (n: Notification) => !n.isRead,
+      );
+      const promises = unreadNotifications.map((notification: Notification) =>
+        execute(() => apiOperations.notifications.markAsRead(notification.id!)),
+      );
+      await Promise.all(promises);
+      refetch();
+    } catch (error) {
+      console.error("Erro ao marcar todas as notificações como lidas:", error);
+    }
   };
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, read: true })));
+  const handleDelete = async (notificationId: number) => {
+    try {
+      await execute(() => apiOperations.notifications.delete(notificationId));
+      refetch();
+    } catch (error) {
+      console.error("Erro ao excluir notificação:", error);
+    }
   };
 
-  const handleDelete = (notificationId: number) => {
-    setNotifications(notifications.filter(n => n.id !== notificationId));
-  };
+  const unreadCount = studentNotifications.filter(
+    (n: Notification) => !n.isRead,
+  ).length;
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  if (loading) {
+    return <div>Carregando notificações...</div>;
+  }
 
   return (
     <Stack gap="lg">
@@ -165,9 +161,10 @@ export default function AlunoNotificacoesPage() {
             Configurações
           </Button>
           {unreadCount > 0 && (
-            <Button 
+            <Button
               leftSection={<IconMarkdown size="1rem" />}
               onClick={handleMarkAllAsRead}
+              loading={operationLoading}
             >
               Marcar todas como lidas
             </Button>
@@ -181,8 +178,12 @@ export default function AlunoNotificacoesPage() {
           <Card withBorder padding="md">
             <Group justify="space-between">
               <div>
-                <Text size="sm" c="dimmed" mb="xs">Total</Text>
-                <Text size="xl" fw={700}>{notifications.length}</Text>
+                <Text size="sm" c="dimmed" mb="xs">
+                  Total
+                </Text>
+                <Text size="xl" fw={700}>
+                  {studentNotifications.length}
+                </Text>
               </div>
               <IconBell size="2rem" color="blue" />
             </Group>
@@ -192,8 +193,12 @@ export default function AlunoNotificacoesPage() {
           <Card withBorder padding="md">
             <Group justify="space-between">
               <div>
-                <Text size="sm" c="dimmed" mb="xs">Não Lidas</Text>
-                <Text size="xl" fw={700} c="orange">{unreadCount}</Text>
+                <Text size="sm" c="dimmed" mb="xs">
+                  Não Lidas
+                </Text>
+                <Text size="xl" fw={700} c="orange">
+                  {unreadCount}
+                </Text>
               </div>
               <IconBellOff size="2rem" color="orange" />
             </Group>
@@ -203,8 +208,12 @@ export default function AlunoNotificacoesPage() {
           <Card withBorder padding="md">
             <Group justify="space-between">
               <div>
-                <Text size="sm" c="dimmed" mb="xs">Lidas</Text>
-                <Text size="xl" fw={700} c="green">{notifications.length - unreadCount}</Text>
+                <Text size="sm" c="dimmed" mb="xs">
+                  Lidas
+                </Text>
+                <Text size="xl" fw={700} c="green">
+                  {studentNotifications.length - unreadCount}
+                </Text>
               </div>
               <IconCheck size="2rem" color="green" />
             </Group>
@@ -219,10 +228,10 @@ export default function AlunoNotificacoesPage() {
             <Select
               placeholder="Filtrar por tipo"
               data={[
-                { value: 'success', label: 'Sucesso' },
-                { value: 'warning', label: 'Aviso' },
-                { value: 'error', label: 'Erro' },
-                { value: 'info', label: 'Informação' },
+                { value: "success", label: "Sucesso" },
+                { value: "warning", label: "Aviso" },
+                { value: "error", label: "Erro" },
+                { value: "info", label: "Informação" },
               ]}
               value={typeFilter}
               onChange={setTypeFilter}
@@ -233,8 +242,8 @@ export default function AlunoNotificacoesPage() {
             <Select
               placeholder="Filtrar por status"
               data={[
-                { value: 'read', label: 'Lidas' },
-                { value: 'unread', label: 'Não lidas' },
+                { value: "read", label: "Lidas" },
+                { value: "unread", label: "Não lidas" },
               ]}
               value={readFilter}
               onChange={setReadFilter}
@@ -255,27 +264,33 @@ export default function AlunoNotificacoesPage() {
           <Card withBorder padding="xl">
             <Stack align="center" gap="md">
               <IconBell size="3rem" color="gray" />
-              <Text size="lg" c="dimmed">Nenhuma notificação encontrada</Text>
+              <Text size="lg" c="dimmed">
+                Nenhuma notificação encontrada
+              </Text>
               <Text size="sm" c="dimmed" ta="center">
                 Não há notificações que correspondam aos filtros selecionados.
               </Text>
             </Stack>
           </Card>
         ) : (
-          filteredNotifications.map((notification) => (
-            <Card 
-              key={notification.id} 
-              withBorder 
+          filteredNotifications.map((notification: Notification) => (
+            <Card
+              key={notification.id}
+              withBorder
               padding="md"
-              style={{ 
-                backgroundColor: notification.read ? undefined : '#f8fafc',
-                borderLeft: notification.read ? undefined : '4px solid #3b82f6'
+              style={{
+                backgroundColor: notification.isRead ? undefined : "#f8fafc",
+                borderLeft: notification.isRead
+                  ? undefined
+                  : "4px solid #3b82f6",
               }}
             >
               <Group justify="space-between" align="flex-start">
                 <Group align="flex-start" style={{ flex: 1 }}>
-                  <div style={{ color: getTypeColor(notification.type) }}>
-                    {getTypeIcon(notification.type)}
+                  <div
+                    style={{ color: getTypeColor(notification.type || "info") }}
+                  >
+                    {getTypeIcon(notification.type || "info")}
                   </div>
                   <div style={{ flex: 1 }}>
                     <Group justify="space-between" mb="xs">
@@ -283,51 +298,60 @@ export default function AlunoNotificacoesPage() {
                         {notification.title}
                       </Text>
                       <Group gap="xs">
-                        <Badge 
-                          color={getPriorityColor(notification.priority)} 
-                          variant="light" 
-                          size="xs"
-                        >
-                          {getPriorityLabel(notification.priority)}
-                        </Badge>
-                        {!notification.read && (
+                        {notification.status && (
+                          <Badge
+                            color={getPriorityColor(notification.status)}
+                            variant="light"
+                            size="xs"
+                          >
+                            {notification.status}
+                          </Badge>
+                        )}
+                        {!notification.isRead && (
                           <Badge color="blue" variant="filled" size="xs">
                             Nova
                           </Badge>
                         )}
                       </Group>
                     </Group>
-                    
+
                     <Text size="sm" c="dimmed" mb="md">
                       {notification.message}
                     </Text>
-                    
+
                     <Group justify="space-between" align="center">
                       <Text size="xs" c="dimmed">
-                        {new Date(notification.createdAt).toLocaleDateString('pt-BR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
+                        {notification.createdAt
+                          ? new Date(notification.createdAt).toLocaleDateString(
+                              "pt-BR",
+                              {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              },
+                            )
+                          : "Data não disponível"}
                       </Text>
-                      
+
                       <Group gap="xs">
-                        {!notification.read && (
-                          <Button 
-                            size="xs" 
+                        {!notification.isRead && (
+                          <Button
+                            size="xs"
                             variant="light"
-                            onClick={() => handleMarkAsRead(notification.id)}
+                            onClick={() => handleMarkAsRead(notification.id!)}
+                            loading={operationLoading}
                           >
                             Marcar como lida
                           </Button>
                         )}
-                        <ActionIcon 
-                          variant="subtle" 
-                          color="red" 
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
                           size="sm"
-                          onClick={() => handleDelete(notification.id)}
+                          onClick={() => handleDelete(notification.id!)}
+                          loading={operationLoading}
                         >
                           <IconTrash size="0.8rem" />
                         </ActionIcon>
@@ -345,13 +369,17 @@ export default function AlunoNotificacoesPage() {
       <Card withBorder padding="lg">
         <Group mb="md">
           <IconSettings size="1.2rem" color="blue" />
-          <Text fw={500} size="lg">Preferências de Notificação</Text>
+          <Text fw={500} size="lg">
+            Preferências de Notificação
+          </Text>
         </Group>
-        
+
         <Grid>
           <Grid.Col span={{ base: 12, md: 6 }}>
             <Stack gap="sm">
-              <Text size="sm" fw={500}>Receber notificações sobre:</Text>
+              <Text size="sm" fw={500}>
+                Receber notificações sobre:
+              </Text>
               <Text size="sm">✓ Alterações de horário</Text>
               <Text size="sm">✓ Confirmações de pagamento</Text>
               <Text size="sm">✓ Lembretes de vencimento</Text>
@@ -360,7 +388,9 @@ export default function AlunoNotificacoesPage() {
           </Grid.Col>
           <Grid.Col span={{ base: 12, md: 6 }}>
             <Stack gap="sm">
-              <Text size="sm" fw={500}>Canais de notificação:</Text>
+              <Text size="sm" fw={500}>
+                Canais de notificação:
+              </Text>
               <Text size="sm">✓ Sistema (aqui no app)</Text>
               <Text size="sm">✓ Email</Text>
               <Text size="sm">✗ SMS</Text>
@@ -373,8 +403,8 @@ export default function AlunoNotificacoesPage() {
 
         <Alert icon={<IconInfoCircle size="1rem" />} color="blue">
           <Text size="sm">
-            Para alterar suas preferências de notificação, entre em contato com o suporte 
-            ou acesse as configurações do seu perfil.
+            Para alterar suas preferências de notificação, entre em contato com
+            o suporte ou acesse as configurações do seu perfil.
           </Text>
         </Alert>
       </Card>

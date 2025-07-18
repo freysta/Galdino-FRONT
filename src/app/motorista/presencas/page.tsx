@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Title,
   Button,
@@ -12,11 +12,10 @@ import {
   Select,
   Grid,
   Textarea,
-  Switch,
   Alert,
   Divider,
   ActionIcon,
-} from '@mantine/core';
+} from "@mantine/core";
 import {
   IconUsers,
   IconCheck,
@@ -26,122 +25,150 @@ import {
   IconAlertCircle,
   IconSend,
   IconRefresh,
-} from '@tabler/icons-react';
+} from "@tabler/icons-react";
 
-// Mock data
-const mockRoutes = [
-  {
-    id: 1,
-    destination: 'Campus Norte - UNIFESP',
-    time: '07:30',
-    boardingPoint: 'Terminal Rodoviário',
-    status: 'active',
-  },
-  {
-    id: 2,
-    destination: 'Campus Norte - UNIFESP',
-    time: '12:30',
-    boardingPoint: 'Terminal Rodoviário',
-    status: 'pending',
-  },
-];
-
-const mockStudents = [
-  {
-    id: 1,
-    name: 'Ana Silva Santos',
-    boardingPoint: 'Terminal Rodoviário',
-    phone: '(11) 99999-1111',
-    status: null, // null, 'present', 'absent'
-    observation: '',
-  },
-  {
-    id: 2,
-    name: 'Carlos Eduardo Lima',
-    boardingPoint: 'Terminal Rodoviário',
-    phone: '(11) 99999-2222',
-    status: 'present',
-    observation: '',
-  },
-  {
-    id: 3,
-    name: 'Mariana Costa Oliveira',
-    boardingPoint: 'Shopping Center',
-    phone: '(11) 99999-3333',
-    status: null,
-    observation: '',
-  },
-  {
-    id: 4,
-    name: 'Pedro Henrique Souza',
-    boardingPoint: 'Terminal Rodoviário',
-    phone: '(11) 99999-4444',
-    status: 'absent',
-    observation: 'Avisou que não vai hoje',
-  },
-  {
-    id: 5,
-    name: 'Juliana Ferreira',
-    boardingPoint: 'Shopping Center',
-    phone: '(11) 99999-5555',
-    status: 'present',
-    observation: '',
-  },
-];
+import {
+  useRoutes,
+  useStudents,
+  useAttendance,
+  useApiOperations,
+  apiOperations,
+} from "@/hooks/useApiData";
+import { Route, Student, Attendance } from "@/services/api";
 
 export default function PresencasPage() {
-  const [selectedRoute, setSelectedRoute] = useState<string>('1');
-  const [students, setStudents] = useState(mockStudents);
-  const [observations, setObservations] = useState<{[key: number]: string}>({});
+  const [selectedRoute, setSelectedRoute] = useState<string>("");
+  const [observations, setObservations] = useState<{ [key: number]: string }>(
+    {},
+  );
+  const [attendanceData, setAttendanceData] = useState<{
+    [key: number]: "present" | "absent" | null;
+  }>({});
 
-  const selectedRouteData = mockRoutes.find(r => r.id.toString() === selectedRoute);
+  // Usar a API real
+  const {
+    data: routes,
+    loading: routesLoading,
+    refetch: refetchRoutes,
+  } = useRoutes();
+  const { data: students, loading: studentsLoading } = useStudents();
+  const {
+    data: attendance,
+    loading: attendanceLoading,
+    refetch: refetchAttendance,
+  } = useAttendance();
+  const { execute, loading: operationLoading } = useApiOperations();
 
-  const handlePresenceChange = (studentId: number, status: 'present' | 'absent') => {
-    setStudents(students.map(student => 
-      student.id === studentId 
-        ? { ...student, status }
-        : student
-    ));
-  };
+  // Filtrar rotas ativas
+  const activeRoutes =
+    routes?.filter(
+      (route: Route) => route.status === "Ativo" || route.status === "Agendada",
+    ) || [];
 
-  const handleObservationChange = (studentId: number, observation: string) => {
-    setObservations(prev => ({
+  const selectedRouteData = activeRoutes.find(
+    (r: Route) => r.id?.toString() === selectedRoute,
+  );
+
+  // Filtrar alunos da rota selecionada (simulado - pode ser expandido com relação rota-aluno)
+  const routeStudents = students?.slice(0, 10) || []; // Limitando para exemplo
+
+  const handlePresenceChange = (
+    studentId: number,
+    status: "present" | "absent",
+  ) => {
+    setAttendanceData((prev) => ({
       ...prev,
-      [studentId]: observation
+      [studentId]: status,
     }));
   };
 
-  const handleSubmitAttendance = () => {
-    // Aqui seria enviado para o backend
-    console.log('Presenças confirmadas:', students);
-    alert('Presenças confirmadas com sucesso!');
+  const handleObservationChange = (studentId: number, observation: string) => {
+    setObservations((prev) => ({
+      ...prev,
+      [studentId]: observation,
+    }));
   };
 
-  const presentCount = students.filter(s => s.status === 'present').length;
-  const absentCount = students.filter(s => s.status === 'absent').length;
-  const pendingCount = students.filter(s => s.status === null).length;
+  const handleSubmitAttendance = async () => {
+    if (!selectedRoute) {
+      alert("Selecione uma rota primeiro");
+      return;
+    }
 
-  const getStatusColor = (status: string | null) => {
-    switch (status) {
-      case 'present': return 'green';
-      case 'absent': return 'red';
-      default: return 'gray';
+    try {
+      // Criar registros de presença para cada aluno
+      const attendancePromises = routeStudents.map((student: Student) => {
+        const status = attendanceData[student.id!] || "absent";
+        const observation = observations[student.id!] || "";
+
+        return execute(() =>
+          apiOperations.attendance.create({
+            studentId: student.id!,
+            routeId: parseInt(selectedRoute),
+            status: status === "present" ? "Presente" : "Ausente",
+            date: new Date().toISOString().split("T")[0],
+            observation,
+          }),
+        );
+      });
+
+      await Promise.all(attendancePromises);
+
+      alert("Presenças confirmadas com sucesso!");
+      refetchAttendance();
+
+      // Limpar dados
+      setAttendanceData({});
+      setObservations({});
+    } catch (error) {
+      alert("Erro ao confirmar presenças");
     }
   };
 
-  const getStatusLabel = (status: string | null) => {
+  const handleRefresh = () => {
+    refetchRoutes();
+    refetchAttendance();
+  };
+
+  const presentCount = Object.values(attendanceData).filter(
+    (status) => status === "present",
+  ).length;
+  const absentCount = Object.values(attendanceData).filter(
+    (status) => status === "absent",
+  ).length;
+  const pendingCount = routeStudents.length - presentCount - absentCount;
+
+  const getStatusColor = (status: "present" | "absent" | null) => {
     switch (status) {
-      case 'present': return 'Presente';
-      case 'absent': return 'Ausente';
-      default: return 'Pendente';
+      case "present":
+        return "green";
+      case "absent":
+        return "red";
+      default:
+        return "gray";
     }
   };
+
+  const getStatusLabel = (status: "present" | "absent" | null) => {
+    switch (status) {
+      case "present":
+        return "Presente";
+      case "absent":
+        return "Ausente";
+      default:
+        return "Pendente";
+    }
+  };
+
+  if (routesLoading || studentsLoading || attendanceLoading) {
+    return <div>Carregando dados...</div>;
+  }
 
   return (
     <Stack gap="lg">
       <Group justify="space-between">
         <Title order={1}>Confirmar Presença</Title>
-        <ActionIcon variant="light" size="lg">
+        <ActionIcon variant="light" size="lg" onClick={handleRefresh}>
           <IconRefresh size="1.2rem" />
         </ActionIcon>
       </Group>
@@ -153,29 +180,44 @@ export default function PresencasPage() {
             <Select
               label="Selecione a rota"
               placeholder="Escolha uma rota"
-              data={mockRoutes.map(route => ({
-                value: route.id.toString(),
-                label: `${route.time} - ${route.destination}`
+              data={activeRoutes.map((route: Route) => ({
+                value: route.id?.toString() || "",
+                label: `${route.departureTime || route.time || "N/A"} - ${route.destination || route.name || "Rota sem nome"}`,
               }))}
               value={selectedRoute}
-              onChange={(value) => setSelectedRoute(value || '1')}
+              onChange={(value) => setSelectedRoute(value || "")}
             />
           </Grid.Col>
           <Grid.Col span={{ base: 12, md: 6 }}>
             {selectedRouteData && (
               <div>
-                <Text size="sm" c="dimmed" mb="xs">Informações da Rota</Text>
+                <Text size="sm" c="dimmed" mb="xs">
+                  Informações da Rota
+                </Text>
                 <Group gap="md">
                   <Group gap="xs">
                     <IconClock size="0.8rem" />
-                    <Text size="sm">{selectedRouteData.time}</Text>
+                    <Text size="sm">
+                      {selectedRouteData.departureTime ||
+                        selectedRouteData.time ||
+                        "N/A"}
+                    </Text>
                   </Group>
                   <Group gap="xs">
                     <IconMapPin size="0.8rem" />
-                    <Text size="sm">{selectedRouteData.boardingPoint}</Text>
+                    <Text size="sm">
+                      {selectedRouteData.origin || "Ponto de partida"}
+                    </Text>
                   </Group>
-                  <Badge color={selectedRouteData.status === 'active' ? 'green' : 'orange'} variant="light">
-                    {selectedRouteData.status === 'active' ? 'Em andamento' : 'Pendente'}
+                  <Badge
+                    color={
+                      selectedRouteData.status === "Ativo" ? "green" : "orange"
+                    }
+                    variant="light"
+                  >
+                    {selectedRouteData.status === "Ativo"
+                      ? "Em andamento"
+                      : "Agendada"}
                   </Badge>
                 </Group>
               </div>
@@ -187,33 +229,45 @@ export default function PresencasPage() {
       {/* Resumo de presenças */}
       <Grid>
         <Grid.Col span={{ base: 12, sm: 4 }}>
-          <Card withBorder padding="md" style={{ backgroundColor: '#f0f9ff' }}>
+          <Card withBorder padding="md" style={{ backgroundColor: "#f0f9ff" }}>
             <Group justify="space-between">
               <div>
-                <Text size="sm" c="dimmed">Presentes</Text>
-                <Text size="xl" fw={700} c="green">{presentCount}</Text>
+                <Text size="sm" c="dimmed">
+                  Presentes
+                </Text>
+                <Text size="xl" fw={700} c="green">
+                  {presentCount}
+                </Text>
               </div>
               <IconCheck size="2rem" color="green" />
             </Group>
           </Card>
         </Grid.Col>
         <Grid.Col span={{ base: 12, sm: 4 }}>
-          <Card withBorder padding="md" style={{ backgroundColor: '#fef2f2' }}>
+          <Card withBorder padding="md" style={{ backgroundColor: "#fef2f2" }}>
             <Group justify="space-between">
               <div>
-                <Text size="sm" c="dimmed">Ausentes</Text>
-                <Text size="xl" fw={700} c="red">{absentCount}</Text>
+                <Text size="sm" c="dimmed">
+                  Ausentes
+                </Text>
+                <Text size="xl" fw={700} c="red">
+                  {absentCount}
+                </Text>
               </div>
               <IconX size="2rem" color="red" />
             </Group>
           </Card>
         </Grid.Col>
         <Grid.Col span={{ base: 12, sm: 4 }}>
-          <Card withBorder padding="md" style={{ backgroundColor: '#f9fafb' }}>
+          <Card withBorder padding="md" style={{ backgroundColor: "#f9fafb" }}>
             <Group justify="space-between">
               <div>
-                <Text size="sm" c="dimmed">Pendentes</Text>
-                <Text size="xl" fw={700} c="gray">{pendingCount}</Text>
+                <Text size="sm" c="dimmed">
+                  Pendentes
+                </Text>
+                <Text size="xl" fw={700} c="gray">
+                  {pendingCount}
+                </Text>
               </div>
               <IconUsers size="2rem" color="gray" />
             </Group>
@@ -224,14 +278,31 @@ export default function PresencasPage() {
       {/* Lista de alunos */}
       <Card withBorder padding="lg">
         <Group justify="space-between" mb="md">
-          <Text fw={500} size="lg">Lista de Alunos</Text>
+          <Text fw={500} size="lg">
+            Lista de Alunos
+          </Text>
           <Text size="sm" c="dimmed">
-            {students.length} alunos cadastrados
+            {routeStudents.length} alunos cadastrados
           </Text>
         </Group>
 
+        {!selectedRoute && (
+          <Alert icon={<IconAlertCircle size="1rem" />} color="blue" mb="md">
+            <Text size="sm">
+              Selecione uma rota para visualizar os alunos e confirmar as
+              presenças.
+            </Text>
+          </Alert>
+        )}
+
+        {selectedRoute && routeStudents.length === 0 && (
+          <Alert icon={<IconAlertCircle size="1rem" />} color="gray" mb="md">
+            <Text size="sm">Nenhum aluno encontrado para esta rota.</Text>
+          </Alert>
+        )}
+
         <Stack gap="md">
-          {students.map((student) => (
+          {routeStudents.map((student: Student) => (
             <Card key={student.id} withBorder radius="sm" padding="md">
               <Grid align="center">
                 <Grid.Col span={{ base: 12, md: 4 }}>
@@ -239,48 +310,69 @@ export default function PresencasPage() {
                     <Text fw={500}>{student.name}</Text>
                     <Group gap="xs" mt="xs">
                       <IconMapPin size="0.8rem" />
-                      <Text size="sm" c="dimmed">{student.boardingPoint}</Text>
+                      <Text size="sm" c="dimmed">
+                        {student.address || "Endereço não informado"}
+                      </Text>
                     </Group>
-                    <Text size="xs" c="dimmed">{student.phone}</Text>
+                    <Text size="xs" c="dimmed">
+                      {student.phone || "Telefone não informado"}
+                    </Text>
                   </div>
                 </Grid.Col>
-                
+
                 <Grid.Col span={{ base: 12, md: 3 }}>
                   <Group gap="xs">
                     <Button
                       size="sm"
-                      variant={student.status === 'present' ? 'filled' : 'light'}
+                      variant={
+                        attendanceData[student.id!] === "present"
+                          ? "filled"
+                          : "light"
+                      }
                       color="green"
                       leftSection={<IconCheck size="0.8rem" />}
-                      onClick={() => handlePresenceChange(student.id, 'present')}
+                      onClick={() =>
+                        handlePresenceChange(student.id!, "present")
+                      }
                     >
                       Presente
                     </Button>
                     <Button
                       size="sm"
-                      variant={student.status === 'absent' ? 'filled' : 'light'}
+                      variant={
+                        attendanceData[student.id!] === "absent"
+                          ? "filled"
+                          : "light"
+                      }
                       color="red"
                       leftSection={<IconX size="0.8rem" />}
-                      onClick={() => handlePresenceChange(student.id, 'absent')}
+                      onClick={() =>
+                        handlePresenceChange(student.id!, "absent")
+                      }
                     >
                       Ausente
                     </Button>
                   </Group>
                 </Grid.Col>
-                
+
                 <Grid.Col span={{ base: 12, md: 2 }}>
-                  <Badge color={getStatusColor(student.status)} variant="light">
-                    {getStatusLabel(student.status)}
+                  <Badge
+                    color={getStatusColor(attendanceData[student.id!] || null)}
+                    variant="light"
+                  >
+                    {getStatusLabel(attendanceData[student.id!] || null)}
                   </Badge>
                 </Grid.Col>
-                
+
                 <Grid.Col span={{ base: 12, md: 3 }}>
                   <Textarea
                     placeholder="Observações..."
                     size="sm"
                     rows={2}
-                    value={observations[student.id] || student.observation}
-                    onChange={(e) => handleObservationChange(student.id, e.target.value)}
+                    value={observations[student.id!] || ""}
+                    onChange={(e) =>
+                      handleObservationChange(student.id!, e.target.value)
+                    }
                   />
                 </Grid.Col>
               </Grid>
@@ -288,35 +380,44 @@ export default function PresencasPage() {
           ))}
         </Stack>
 
-        <Divider my="lg" />
+        {selectedRoute && routeStudents.length > 0 && (
+          <>
+            <Divider my="lg" />
 
-        {pendingCount > 0 && (
-          <Alert icon={<IconAlertCircle size="1rem" />} color="orange" mb="md">
-            <Text size="sm">
-              Ainda há {pendingCount} aluno(s) com presença pendente. 
-              Confirme a presença de todos antes de finalizar.
-            </Text>
-          </Alert>
+            {pendingCount > 0 && (
+              <Alert
+                icon={<IconAlertCircle size="1rem" />}
+                color="orange"
+                mb="md"
+              >
+                <Text size="sm">
+                  Ainda há {pendingCount} aluno(s) com presença pendente.
+                  Confirme a presença de todos antes de finalizar.
+                </Text>
+              </Alert>
+            )}
+
+            <Group justify="flex-end">
+              <Button
+                variant="light"
+                onClick={() => {
+                  setAttendanceData({});
+                  setObservations({});
+                }}
+              >
+                Limpar
+              </Button>
+              <Button
+                leftSection={<IconSend size="1rem" />}
+                onClick={handleSubmitAttendance}
+                disabled={pendingCount > 0 || operationLoading}
+                loading={operationLoading}
+              >
+                Confirmar Presenças
+              </Button>
+            </Group>
+          </>
         )}
-
-        <Group justify="flex-end">
-          <Button 
-            variant="light" 
-            onClick={() => {
-              setStudents(mockStudents);
-              setObservations({});
-            }}
-          >
-            Limpar
-          </Button>
-          <Button 
-            leftSection={<IconSend size="1rem" />}
-            onClick={handleSubmitAttendance}
-            disabled={pendingCount > 0}
-          >
-            Confirmar Presenças
-          </Button>
-        </Group>
       </Card>
     </Stack>
   );

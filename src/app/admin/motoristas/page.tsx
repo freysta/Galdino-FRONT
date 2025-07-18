@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Title,
   Button,
@@ -18,8 +18,8 @@ import {
   Pagination,
   Menu,
   Alert,
-} from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+} from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
 import {
   IconPlus,
   IconSearch,
@@ -31,111 +31,87 @@ import {
   IconMail,
   IconCar,
   IconAlertCircle,
-} from '@tabler/icons-react';
-
-// Mock data
-const mockDrivers = [
-  {
-    id: 1,
-    name: 'Carlos Santos Silva',
-    email: 'carlos.santos@email.com',
-    phone: '(11) 98888-1111',
-    cnh: '12345678901',
-    cnhCategory: 'D',
-    status: 'active',
-    vehicle: 'Ônibus 001',
-    experience: '5 anos',
-    joinDate: '2023-06-15',
-  },
-  {
-    id: 2,
-    name: 'Maria Oliveira Costa',
-    email: 'maria.oliveira@email.com',
-    phone: '(11) 98888-2222',
-    cnh: '23456789012',
-    cnhCategory: 'D',
-    status: 'active',
-    vehicle: 'Ônibus 002',
-    experience: '8 anos',
-    joinDate: '2023-03-10',
-  },
-  {
-    id: 3,
-    name: 'João Pereira Lima',
-    email: 'joao.pereira@email.com',
-    phone: '(11) 98888-3333',
-    cnh: '34567890123',
-    cnhCategory: 'D',
-    status: 'inactive',
-    vehicle: 'Não atribuído',
-    experience: '3 anos',
-    joinDate: '2023-09-20',
-  },
-  {
-    id: 4,
-    name: 'Ana Paula Rodrigues',
-    email: 'ana.rodrigues@email.com',
-    phone: '(11) 98888-4444',
-    cnh: '45678901234',
-    cnhCategory: 'D',
-    status: 'active',
-    vehicle: 'Ônibus 003',
-    experience: '6 anos',
-    joinDate: '2023-01-08',
-  },
-];
+} from "@tabler/icons-react";
+import {
+  useDrivers,
+  useApiOperations,
+  apiOperations,
+} from "@/hooks/useApiData";
+import { Driver } from "@/services/api";
 
 export default function MotoristasPage() {
   const [opened, { open, close }] = useDisclosure(false);
-  const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false);
-  const [drivers, setDrivers] = useState(mockDrivers);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [
+    deleteModalOpened,
+    { open: openDeleteModal, close: closeDeleteModal },
+  ] = useDisclosure(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [editingDriver, setEditingDriver] = useState<any>(null);
-  const [driverToDelete, setDriverToDelete] = useState<any>(null);
+  const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
+  const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
+
+  // Usar a API real
+  const { data: drivers, loading, error, refetch } = useDrivers();
+  const { execute, loading: operationLoading } = useApiOperations();
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'green';
-      case 'inactive': return 'red';
-      case 'suspended': return 'orange';
-      default: return 'gray';
+    switch (status?.toLowerCase()) {
+      case "ativo":
+        return "green";
+      case "inativo":
+        return "red";
+      case "suspenso":
+        return "orange";
+      default:
+        return "gray";
     }
   };
 
   const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'active': return 'Ativo';
-      case 'inactive': return 'Inativo';
-      case 'suspended': return 'Suspenso';
-      default: return 'Desconhecido';
+    switch (status?.toLowerCase()) {
+      case "ativo":
+        return "Ativo";
+      case "inativo":
+        return "Inativo";
+      case "suspenso":
+        return "Suspenso";
+      default:
+        status || "Desconhecido";
     }
   };
 
-  const filteredDrivers = drivers.filter(driver => {
-    const matchesSearch = driver.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         driver.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         driver.cnh.includes(searchTerm);
-    const matchesStatus = !statusFilter || driver.status === statusFilter;
+  const filteredDrivers = drivers.filter((driver) => {
+    const matchesSearch =
+      driver.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      driver.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (driver.cnh && driver.cnh.includes(searchTerm));
+    const matchesStatus =
+      !statusFilter ||
+      driver.status?.toLowerCase() === statusFilter.toLowerCase();
     return matchesSearch && matchesStatus;
   });
 
-  const handleEdit = (driver: any) => {
+  const handleEdit = (driver: Driver) => {
     setEditingDriver(driver);
     open();
   };
 
-  const handleDeleteClick = (driver: any) => {
+  const handleDeleteClick = (driver: Driver) => {
     setDriverToDelete(driver);
     openDeleteModal();
   };
 
-  const handleDeleteConfirm = () => {
-    if (driverToDelete) {
-      setDrivers(drivers.filter(d => d.id !== driverToDelete.id));
-      setDriverToDelete(null);
-      closeDeleteModal();
+  const handleDeleteConfirm = async () => {
+    if (driverToDelete?.id) {
+      try {
+        await execute(() => apiOperations.drivers.delete(driverToDelete.id!));
+        setDriverToDelete(null);
+        closeDeleteModal();
+        refetch();
+      } catch (error) {
+        alert("Erro ao excluir motorista");
+      }
     }
   };
 
@@ -144,16 +120,61 @@ export default function MotoristasPage() {
     open();
   };
 
+  const handleSave = async (driverData: Partial<Driver>) => {
+    try {
+      if (editingDriver?.id) {
+        await execute(() =>
+          apiOperations.drivers.update(editingDriver.id!, driverData),
+        );
+      } else {
+        await execute(() => apiOperations.drivers.create(driverData as Driver));
+      }
+      close();
+      setEditingDriver(null);
+      refetch();
+    } catch (error) {
+      alert("Erro ao salvar motorista");
+    }
+  };
+
   const itemsPerPage = 10;
   const totalPages = Math.ceil(filteredDrivers.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedDrivers = filteredDrivers.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedDrivers = filteredDrivers.slice(
+    startIndex,
+    startIndex + itemsPerPage,
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">
+            Erro ao carregar motoristas: {error}
+          </p>
+          <Button onClick={refetch}>Tentar Novamente</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Stack gap="lg">
       <Group justify="space-between">
         <Title order={1}>Gerenciar Motoristas</Title>
-        <Button leftSection={<IconPlus size="1rem" />} onClick={handleAddNew}>
+        <Button
+          leftSection={<IconPlus size="1rem" />}
+          onClick={handleAddNew}
+          disabled={operationLoading}
+        >
           Adicionar Motorista
         </Button>
       </Group>
@@ -173,9 +194,9 @@ export default function MotoristasPage() {
             <Select
               placeholder="Status"
               data={[
-                { value: 'active', label: 'Ativo' },
-                { value: 'inactive', label: 'Inativo' },
-                { value: 'suspended', label: 'Suspenso' },
+                { value: "ativo", label: "Ativo" },
+                { value: "inativo", label: "Inativo" },
+                { value: "suspenso", label: "Suspenso" },
               ]}
               value={statusFilter}
               onChange={setStatusFilter}
@@ -210,10 +231,13 @@ export default function MotoristasPage() {
                   <div>
                     <Text fw={500}>{driver.name}</Text>
                     <Text size="xs" c="dimmed">
-                      {driver.experience} de experiência
+                      CPF: {driver.cpf || "Não informado"}
                     </Text>
                     <Text size="xs" c="dimmed">
-                      Desde {new Date(driver.joinDate).toLocaleDateString('pt-BR')}
+                      Desde{" "}
+                      {driver.createdAt
+                        ? new Date(driver.createdAt).toLocaleDateString("pt-BR")
+                        : "N/A"}
                     </Text>
                   </div>
                 </Table.Td>
@@ -231,16 +255,23 @@ export default function MotoristasPage() {
                 </Table.Td>
                 <Table.Td>
                   <div>
-                    <Text size="sm" ff="monospace">{driver.cnh}</Text>
-                    <Badge size="xs" variant="light" color="blue">
-                      Categoria {driver.cnhCategory}
-                    </Badge>
+                    <Text size="sm" ff="monospace">
+                      {driver.cnh || "Não informado"}
+                    </Text>
+                    <Text size="xs" c="dimmed">
+                      Venc:{" "}
+                      {driver.licenseExpiry
+                        ? new Date(driver.licenseExpiry).toLocaleDateString(
+                            "pt-BR",
+                          )
+                        : "N/A"}
+                    </Text>
                   </div>
                 </Table.Td>
                 <Table.Td>
                   <Group gap="xs">
                     <IconCar size="0.8rem" />
-                    <Text size="sm">{driver.vehicle}</Text>
+                    <Text size="sm">{driver.vehicle || "Não atribuído"}</Text>
                   </Group>
                 </Table.Td>
                 <Table.Td>
@@ -259,15 +290,15 @@ export default function MotoristasPage() {
                       <Menu.Item leftSection={<IconEye size="0.9rem" />}>
                         Visualizar
                       </Menu.Item>
-                      <Menu.Item 
+                      <Menu.Item
                         leftSection={<IconEdit size="0.9rem" />}
                         onClick={() => handleEdit(driver)}
                       >
                         Editar
                       </Menu.Item>
                       <Menu.Divider />
-                      <Menu.Item 
-                        color="red" 
+                      <Menu.Item
+                        color="red"
                         leftSection={<IconTrash size="0.9rem" />}
                         onClick={() => handleDeleteClick(driver)}
                       >
@@ -293,109 +324,35 @@ export default function MotoristasPage() {
       </Card>
 
       {/* Modal de adicionar/editar motorista */}
-      <Modal opened={opened} onClose={close} title={editingDriver ? "Editar Motorista" : "Adicionar Motorista"} size="lg">
-        <Stack gap="md">
-          <Grid>
-            <Grid.Col span={12}>
-              <TextInput
-                label="Nome completo"
-                placeholder="Digite o nome completo"
-                required
-                defaultValue={editingDriver?.name}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <TextInput
-                label="Email"
-                placeholder="email@exemplo.com"
-                required
-                defaultValue={editingDriver?.email}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <TextInput
-                label="Telefone"
-                placeholder="(11) 99999-9999"
-                required
-                defaultValue={editingDriver?.phone}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <TextInput
-                label="CNH"
-                placeholder="00000000000"
-                required
-                defaultValue={editingDriver?.cnh}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <Select
-                label="Categoria CNH"
-                placeholder="Selecione a categoria"
-                data={[
-                  { value: 'D', label: 'Categoria D' },
-                  { value: 'E', label: 'Categoria E' },
-                ]}
-                required
-                defaultValue={editingDriver?.cnhCategory}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <Select
-                label="Veículo"
-                placeholder="Selecione um veículo"
-                data={[
-                  { value: 'onibus-001', label: 'Ônibus 001' },
-                  { value: 'onibus-002', label: 'Ônibus 002' },
-                  { value: 'onibus-003', label: 'Ônibus 003' },
-                  { value: 'van-001', label: 'Van 001' },
-                ]}
-                defaultValue={editingDriver?.vehicle}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <Select
-                label="Status"
-                placeholder="Selecione o status"
-                data={[
-                  { value: 'active', label: 'Ativo' },
-                  { value: 'inactive', label: 'Inativo' },
-                  { value: 'suspended', label: 'Suspenso' },
-                ]}
-                required
-                defaultValue={editingDriver?.status}
-              />
-            </Grid.Col>
-            <Grid.Col span={12}>
-              <TextInput
-                label="Experiência"
-                placeholder="Ex: 5 anos"
-                defaultValue={editingDriver?.experience}
-              />
-            </Grid.Col>
-          </Grid>
-          
-          <Group justify="flex-end" mt="md">
-            <Button variant="light" onClick={close}>
-              Cancelar
-            </Button>
-            <Button onClick={close}>
-              {editingDriver ? 'Salvar' : 'Adicionar'}
-            </Button>
-          </Group>
-        </Stack>
+      <Modal
+        opened={opened}
+        onClose={close}
+        title={editingDriver ? "Editar Motorista" : "Adicionar Motorista"}
+        size="lg"
+      >
+        <DriverModalComponent
+          driver={editingDriver}
+          onSave={handleSave}
+          onClose={close}
+          loading={operationLoading}
+        />
       </Modal>
 
       {/* Modal de confirmação de exclusão */}
-      <Modal opened={deleteModalOpened} onClose={closeDeleteModal} title="Confirmar exclusão">
+      <Modal
+        opened={deleteModalOpened}
+        onClose={closeDeleteModal}
+        title="Confirmar exclusão"
+      >
         <Stack gap="md">
           <Alert icon={<IconAlertCircle size="1rem" />} color="red">
             <Text size="sm">
-              Tem certeza que deseja excluir o motorista <strong>{driverToDelete?.name}</strong>? 
-              Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir o motorista{" "}
+              <strong>{driverToDelete?.name}</strong>? Esta ação não pode ser
+              desfeita.
             </Text>
           </Alert>
-          
+
           <Group justify="flex-end">
             <Button variant="light" onClick={closeDeleteModal}>
               Cancelar
@@ -407,5 +364,153 @@ export default function MotoristasPage() {
         </Stack>
       </Modal>
     </Stack>
+  );
+}
+
+interface DriverModalProps {
+  driver: Driver | null;
+  onSave: (data: Partial<Driver>) => void;
+  onClose: () => void;
+  loading: boolean;
+}
+
+function DriverModalComponent({
+  driver,
+  onSave,
+  onClose,
+  loading,
+}: DriverModalProps) {
+  const [formData, setFormData] = useState({
+    name: driver?.name || "",
+    email: driver?.email || "",
+    phone: driver?.phone || "",
+    cpf: driver?.cpf || "",
+    cnh: driver?.cnh || "",
+    vehicle: driver?.vehicle || "",
+    licenseExpiry: driver?.licenseExpiry || "",
+    birthDate: driver?.birthDate || "",
+    status: driver?.status || "ativo",
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <Stack gap="md">
+        <Grid>
+          <Grid.Col span={12}>
+            <TextInput
+              label="Nome completo"
+              placeholder="Digite o nome completo"
+              required
+              value={formData.name}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <TextInput
+              label="Email"
+              placeholder="email@exemplo.com"
+              required
+              value={formData.email}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <TextInput
+              label="Telefone"
+              placeholder="(11) 99999-9999"
+              value={formData.phone}
+              onChange={(e) =>
+                setFormData({ ...formData, phone: e.target.value })
+              }
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <TextInput
+              label="CPF"
+              placeholder="000.000.000-00"
+              value={formData.cpf}
+              onChange={(e) =>
+                setFormData({ ...formData, cpf: e.target.value })
+              }
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <TextInput
+              label="CNH"
+              placeholder="00000000000"
+              value={formData.cnh}
+              onChange={(e) =>
+                setFormData({ ...formData, cnh: e.target.value })
+              }
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <TextInput
+              label="Data de Nascimento"
+              placeholder="YYYY-MM-DD"
+              type="date"
+              value={formData.birthDate}
+              onChange={(e) =>
+                setFormData({ ...formData, birthDate: e.target.value })
+              }
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <TextInput
+              label="Vencimento da CNH"
+              placeholder="YYYY-MM-DD"
+              type="date"
+              value={formData.licenseExpiry}
+              onChange={(e) =>
+                setFormData({ ...formData, licenseExpiry: e.target.value })
+              }
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <TextInput
+              label="Veículo"
+              placeholder="Ex: Ônibus 001"
+              value={formData.vehicle}
+              onChange={(e) =>
+                setFormData({ ...formData, vehicle: e.target.value })
+              }
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 6 }}>
+            <Select
+              label="Status"
+              placeholder="Selecione o status"
+              data={[
+                { value: "ativo", label: "Ativo" },
+                { value: "inativo", label: "Inativo" },
+                { value: "suspenso", label: "Suspenso" },
+              ]}
+              value={formData.status}
+              onChange={(value) =>
+                setFormData({ ...formData, status: value || "ativo" })
+              }
+            />
+          </Grid.Col>
+        </Grid>
+
+        <Group justify="flex-end" mt="md">
+          <Button variant="light" onClick={onClose} disabled={loading}>
+            Cancelar
+          </Button>
+          <Button type="submit" loading={loading}>
+            {driver ? "Salvar" : "Adicionar"}
+          </Button>
+        </Group>
+      </Stack>
+    </form>
   );
 }

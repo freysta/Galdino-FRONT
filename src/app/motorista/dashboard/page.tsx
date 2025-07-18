@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   Grid,
@@ -13,7 +13,7 @@ import {
   ThemeIcon,
   Progress,
   Timeline,
-} from '@mantine/core';
+} from "@mantine/core";
 import {
   IconRoute,
   IconUsers,
@@ -22,108 +22,118 @@ import {
   IconCheck,
   IconAlertCircle,
   IconCar,
-} from '@tabler/icons-react';
+} from "@tabler/icons-react";
 
-// Mock data
-const todayRoutes = [
-  {
-    id: 1,
-    destination: 'Campus Norte - UNIFESP',
-    time: '07:30',
-    studentsConfirmed: 25,
-    studentsTotal: 28,
-    status: 'pending',
-    boardingPoint: 'Terminal Rodoviário',
-    estimatedDuration: '45 min',
-  },
-  {
-    id: 2,
-    destination: 'Campus Norte - UNIFESP',
-    time: '12:30',
-    studentsConfirmed: 22,
-    studentsTotal: 25,
-    status: 'pending',
-    boardingPoint: 'Terminal Rodoviário',
-    estimatedDuration: '45 min',
-  },
-  {
-    id: 3,
-    destination: 'Centro - Retorno',
-    time: '17:30',
-    studentsConfirmed: 0,
-    studentsTotal: 30,
-    status: 'scheduled',
-    boardingPoint: 'Campus Norte',
-    estimatedDuration: '50 min',
-  },
-];
-
-const recentActivity = [
-  {
-    time: '06:45',
-    title: 'Check-in realizado',
-    description: 'Veículo inspecionado e pronto para a primeira viagem',
-    color: 'green',
-    icon: IconCheck,
-  },
-  {
-    time: '07:00',
-    title: 'Rota iniciada',
-    description: 'Saída do terminal rumo ao Campus Norte',
-    color: 'blue',
-    icon: IconRoute,
-  },
-  {
-    time: '07:15',
-    title: 'Presença confirmada',
-    description: '25 de 28 alunos confirmaram presença',
-    color: 'orange',
-    icon: IconUsers,
-  },
-];
-
-const stats = [
-  {
-    title: 'Rotas do Dia',
-    value: '3',
-    description: '2 pendentes, 1 agendada',
-    icon: IconRoute,
-    color: 'blue',
-  },
-  {
-    title: 'Alunos Esperados',
-    value: '83',
-    description: 'Total do dia',
-    icon: IconUsers,
-    color: 'green',
-  },
-  {
-    title: 'Próxima Saída',
-    value: '07:30',
-    description: 'Campus Norte',
-    icon: IconClock,
-    color: 'orange',
-  },
-];
+import { useRoutes, useAttendance, useBuses } from "@/hooks/useApiData";
+import { Route, Attendance, Bus } from "@/services/api";
 
 export default function MotoristaDashboard() {
+  // Usar a API real
+  const { data: routes, loading: routesLoading } = useRoutes();
+  const { data: attendance, loading: attendanceLoading } = useAttendance();
+  const { data: buses, loading: busesLoading } = useBuses();
+
+  // Filtrar rotas do dia atual
+  const today = new Date().toISOString().split("T")[0];
+  const todayRoutes =
+    routes
+      ?.filter(
+        (route: Route) => route.date === today || route.status === "Ativo",
+      )
+      .slice(0, 3) || [];
+
+  // Calcular estatísticas
+  const totalStudentsToday = todayRoutes.reduce(
+    (sum: number, route: Route) => sum + (route.enrolled || 0),
+    0,
+  );
+
+  const nextRoute = todayRoutes.find(
+    (route: Route) => route.status === "Ativo" || route.status === "Agendada",
+  );
+
+  const stats = [
+    {
+      title: "Rotas do Dia",
+      value: todayRoutes.length.toString(),
+      description: `${todayRoutes.filter((r: Route) => r.status === "Ativo").length} ativas`,
+      icon: IconRoute,
+      color: "blue",
+    },
+    {
+      title: "Alunos Esperados",
+      value: totalStudentsToday.toString(),
+      description: "Total do dia",
+      icon: IconUsers,
+      color: "green",
+    },
+    {
+      title: "Próxima Saída",
+      value: nextRoute?.departureTime || nextRoute?.time || "--:--",
+      description: nextRoute?.destination || nextRoute?.name || "Nenhuma rota",
+      icon: IconClock,
+      color: "orange",
+    },
+  ];
+
+  // Atividade recente simulada (pode ser expandida com dados reais)
+  const recentActivity = [
+    {
+      time: "06:45",
+      title: "Check-in realizado",
+      description: "Veículo inspecionado e pronto para a primeira viagem",
+      color: "green",
+      icon: IconCheck,
+    },
+    {
+      time: "07:00",
+      title: "Rota iniciada",
+      description: "Saída do terminal rumo ao destino",
+      color: "blue",
+      icon: IconRoute,
+    },
+    {
+      time: "07:15",
+      title: "Presença confirmada",
+      description: `${attendance?.length || 0} presenças registradas`,
+      color: "orange",
+      icon: IconUsers,
+    },
+  ];
+
+  // Informações do primeiro ônibus (pode ser expandido para o ônibus do motorista)
+  const currentBus = buses?.[0] || null;
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'green';
-      case 'pending': return 'orange';
-      case 'scheduled': return 'blue';
-      default: return 'gray';
+      case "Concluída":
+      case "Ativo":
+        return "green";
+      case "Pendente":
+        return "orange";
+      case "Agendada":
+        return "blue";
+      default:
+        return "gray";
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'completed': return 'Concluída';
-      case 'pending': return 'Pendente';
-      case 'scheduled': return 'Agendada';
-      default: return 'Desconhecido';
+      case "Ativo":
+        return "Em Andamento";
+      case "Agendada":
+        return "Agendada";
+      case "Concluída":
+        return "Concluída";
+      default:
+        return status || "Desconhecido";
     }
   };
+
+  if (routesLoading || attendanceLoading || busesLoading) {
+    return <div>Carregando dashboard...</div>;
+  }
 
   return (
     <Stack gap="lg">
@@ -131,11 +141,12 @@ export default function MotoristaDashboard() {
         <div>
           <Title order={1}>Dashboard do Motorista</Title>
           <Text c="dimmed">
-            Bem-vindo, Carlos! Hoje é {new Date().toLocaleDateString('pt-BR', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
+            Bem-vindo! Hoje é{" "}
+            {new Date().toLocaleDateString("pt-BR", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric",
             })}
           </Text>
         </div>
@@ -162,7 +173,12 @@ export default function MotoristaDashboard() {
                     {stat.description}
                   </Text>
                 </div>
-                <ThemeIcon color={stat.color} variant="light" size={38} radius="md">
+                <ThemeIcon
+                  color={stat.color}
+                  variant="light"
+                  size={38}
+                  radius="md"
+                >
                   <Icon size="1.8rem" stroke={1.5} />
                 </ThemeIcon>
               </Group>
@@ -176,53 +192,72 @@ export default function MotoristaDashboard() {
         <Grid.Col span={{ base: 12, md: 8 }}>
           <Card withBorder padding="lg" radius="md" h="100%">
             <Group justify="space-between" mb="md">
-              <Text fw={500} size="lg">Rotas de Hoje</Text>
+              <Text fw={500} size="lg">
+                Rotas de Hoje
+              </Text>
               <Badge variant="light" color="blue">
                 {todayRoutes.length} rotas
               </Badge>
             </Group>
             <Stack gap="md">
-              {todayRoutes.map((route) => (
+              {todayRoutes.map((route: Route) => (
                 <Card key={route.id} withBorder radius="sm" padding="md">
                   <Group justify="space-between" align="flex-start">
                     <div style={{ flex: 1 }}>
                       <Group justify="space-between" mb="xs">
                         <Text fw={500} size="sm">
-                          {route.destination}
+                          {route.destination || route.name || "Rota sem nome"}
                         </Text>
-                        <Badge color={getStatusColor(route.status)} variant="light" size="sm">
+                        <Badge
+                          color={getStatusColor(route.status)}
+                          variant="light"
+                          size="sm"
+                        >
                           {getStatusLabel(route.status)}
                         </Badge>
                       </Group>
-                      
+
                       <Group gap="md" mb="xs">
                         <Group gap="xs">
                           <IconClock size="0.8rem" />
-                          <Text size="sm" c="dimmed">{route.time}</Text>
+                          <Text size="sm" c="dimmed">
+                            {route.departureTime || route.time || "N/A"}
+                          </Text>
                         </Group>
                         <Group gap="xs">
                           <IconMapPin size="0.8rem" />
-                          <Text size="sm" c="dimmed">{route.boardingPoint}</Text>
+                          <Text size="sm" c="dimmed">
+                            {route.origin || "Ponto de partida"}
+                          </Text>
                         </Group>
                         <Text size="sm" c="dimmed">
-                          Duração: {route.estimatedDuration}
+                          Veículo: {route.vehicle || "N/A"}
                         </Text>
                       </Group>
 
                       <Group justify="space-between" align="center">
                         <div>
                           <Text size="sm">
-                            Alunos: {route.studentsConfirmed}/{route.studentsTotal}
+                            Capacidade: {route.enrolled || 0}/
+                            {route.capacity || 0}
                           </Text>
-                          <Progress 
-                            value={(route.studentsConfirmed / route.studentsTotal) * 100} 
-                            size="sm" 
-                            color={route.studentsConfirmed === route.studentsTotal ? 'green' : 'orange'}
+                          <Progress
+                            value={
+                              route.capacity
+                                ? ((route.enrolled || 0) / route.capacity) * 100
+                                : 0
+                            }
+                            size="sm"
+                            color={
+                              (route.enrolled || 0) === (route.capacity || 0)
+                                ? "green"
+                                : "orange"
+                            }
                             mt="xs"
                           />
                         </div>
-                        
-                        {route.status === 'pending' && (
+
+                        {route.status === "Ativo" && (
                           <Button size="sm" variant="light">
                             Confirmar Presenças
                           </Button>
@@ -232,6 +267,12 @@ export default function MotoristaDashboard() {
                   </Group>
                 </Card>
               ))}
+
+              {todayRoutes.length === 0 && (
+                <Text c="dimmed" ta="center" py="xl">
+                  Nenhuma rota programada para hoje
+                </Text>
+              )}
             </Stack>
           </Card>
         </Grid.Col>
@@ -239,8 +280,14 @@ export default function MotoristaDashboard() {
         {/* Atividade recente */}
         <Grid.Col span={{ base: 12, md: 4 }}>
           <Card withBorder padding="lg" radius="md" h="100%">
-            <Text fw={500} size="lg" mb="md">Atividade de Hoje</Text>
-            <Timeline active={recentActivity.length} bulletSize={24} lineWidth={2}>
+            <Text fw={500} size="lg" mb="md">
+              Atividade de Hoje
+            </Text>
+            <Timeline
+              active={recentActivity.length}
+              bulletSize={24}
+              lineWidth={2}
+            >
               {recentActivity.map((activity, index) => {
                 const Icon = activity.icon;
                 return (
@@ -258,8 +305,12 @@ export default function MotoristaDashboard() {
                     }
                     title={
                       <Group gap="xs">
-                        <Text size="sm" fw={500}>{activity.title}</Text>
-                        <Text size="xs" c="dimmed">{activity.time}</Text>
+                        <Text size="sm" fw={500}>
+                          {activity.title}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {activity.time}
+                        </Text>
                       </Group>
                     }
                   >
@@ -276,27 +327,52 @@ export default function MotoristaDashboard() {
 
       {/* Informações do veículo */}
       <Card withBorder padding="lg" radius="md">
-        <Title order={3} mb="md">Informações do Veículo - Ônibus 001</Title>
+        <Title order={3} mb="md">
+          Informações do Veículo -{" "}
+          {currentBus?.placa || "Veículo não atribuído"}
+        </Title>
         <SimpleGrid cols={{ base: 1, sm: 4 }} spacing="md">
           <div>
-            <Text size="sm" c="dimmed" mb="xs">Quilometragem</Text>
-            <Text size="lg" fw={700}>125.430 km</Text>
+            <Text size="sm" c="dimmed" mb="xs">
+              Modelo
+            </Text>
+            <Text size="lg" fw={700}>
+              {currentBus?.modelo || "N/A"}
+            </Text>
           </div>
           <div>
-            <Text size="sm" c="dimmed" mb="xs">Combustível</Text>
-            <Text size="lg" fw={700} c="green">85%</Text>
-            <Progress value={85} color="green" size="sm" mt="xs" />
+            <Text size="sm" c="dimmed" mb="xs">
+              Capacidade
+            </Text>
+            <Text size="lg" fw={700} c="blue">
+              {currentBus?.capacidade || 0} lugares
+            </Text>
           </div>
           <div>
-            <Text size="sm" c="dimmed" mb="xs">Próxima Manutenção</Text>
-            <Text size="lg" fw={700}>15/02/2024</Text>
+            <Text size="sm" c="dimmed" mb="xs">
+              Ano
+            </Text>
+            <Text size="lg" fw={700}>
+              {currentBus?.ano || "N/A"}
+            </Text>
           </div>
           <div>
-            <Text size="sm" c="dimmed" mb="xs">Status Geral</Text>
-            <Badge color="green" variant="light">
+            <Text size="sm" c="dimmed" mb="xs">
+              Status
+            </Text>
+            <Badge
+              color={
+                currentBus?.status === "Ativo"
+                  ? "green"
+                  : currentBus?.status === "Manutenção"
+                    ? "orange"
+                    : "red"
+              }
+              variant="light"
+            >
               <Group gap="xs">
                 <IconCheck size="0.8rem" />
-                Operacional
+                {currentBus?.status || "Desconhecido"}
               </Group>
             </Badge>
           </div>

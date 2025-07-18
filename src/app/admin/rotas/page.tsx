@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Title,
   Button,
@@ -19,9 +19,9 @@ import {
   Menu,
   Alert,
   Textarea,
-} from '@mantine/core';
+} from "@mantine/core";
 // import { DateInput, TimeInput } from '@mantine/dates';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure } from "@mantine/hooks";
 import {
   IconPlus,
   IconSearch,
@@ -34,121 +34,96 @@ import {
   IconUsers,
   IconAlertCircle,
   IconCar,
-} from '@tabler/icons-react';
+} from "@tabler/icons-react";
 
-// Mock data
-const mockRoutes = [
-  {
-    id: 1,
-    destination: 'Campus Norte - UNIFESP',
-    origin: 'Terminal Rodoviário',
-    date: '2024-01-25',
-    time: '07:30',
-    driver: 'Carlos Santos Silva',
-    vehicle: 'Ônibus 001',
-    capacity: 40,
-    enrolled: 28,
-    status: 'scheduled',
-    boardingPoints: ['Terminal Rodoviário', 'Shopping Center', 'Estação Metro'],
-    price: 15.00,
-  },
-  {
-    id: 2,
-    destination: 'Campus Sul - USP',
-    origin: 'Praça da Sé',
-    date: '2024-01-25',
-    time: '08:00',
-    driver: 'Maria Oliveira Costa',
-    vehicle: 'Ônibus 002',
-    capacity: 35,
-    enrolled: 32,
-    status: 'in_progress',
-    boardingPoints: ['Praça da Sé', 'Av. Paulista', 'Vila Madalena'],
-    price: 18.00,
-  },
-  {
-    id: 3,
-    destination: 'Centro - Mackenzie',
-    origin: 'Terminal Tietê',
-    date: '2024-01-25',
-    time: '09:00',
-    driver: 'João Pereira Lima',
-    vehicle: 'Van 001',
-    capacity: 15,
-    enrolled: 12,
-    status: 'completed',
-    boardingPoints: ['Terminal Tietê', 'Metrô Santana'],
-    price: 12.00,
-  },
-  {
-    id: 4,
-    destination: 'Campus Norte - UNIFESP',
-    origin: 'Terminal Rodoviário',
-    date: '2024-01-26',
-    time: '07:30',
-    driver: 'Ana Paula Rodrigues',
-    vehicle: 'Ônibus 003',
-    capacity: 40,
-    enrolled: 25,
-    status: 'scheduled',
-    boardingPoints: ['Terminal Rodoviário', 'Shopping Center', 'Estação Metro'],
-    price: 15.00,
-  },
-];
+import { useRoutes, useApiOperations, apiOperations } from "@/hooks/useApiData";
+import { Route } from "@/services/api";
 
 export default function RotasPage() {
   const [opened, { open, close }] = useDisclosure(false);
-  const [deleteModalOpened, { open: openDeleteModal, close: closeDeleteModal }] = useDisclosure(false);
-  const [routes, setRoutes] = useState(mockRoutes);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [
+    deleteModalOpened,
+    { open: openDeleteModal, close: closeDeleteModal },
+  ] = useDisclosure(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [editingRoute, setEditingRoute] = useState<any>(null);
-  const [routeToDelete, setRouteToDelete] = useState<any>(null);
+  const [editingRoute, setEditingRoute] = useState<Route | null>(null);
+  const [routeToDelete, setRouteToDelete] = useState<Route | null>(null);
+
+  // Usar a API real
+  const { data: routes, loading, error, refetch } = useRoutes();
+  const { execute, loading: operationLoading } = useApiOperations();
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return 'blue';
-      case 'in_progress': return 'orange';
-      case 'completed': return 'green';
-      case 'cancelled': return 'red';
-      default: return 'gray';
+      case "scheduled":
+        return "blue";
+      case "in_progress":
+        return "orange";
+      case "completed":
+        return "green";
+      case "cancelled":
+        return "red";
+      default:
+        return "gray";
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'scheduled': return 'Agendada';
-      case 'in_progress': return 'Em andamento';
-      case 'completed': return 'Concluída';
-      case 'cancelled': return 'Cancelada';
-      default: return 'Desconhecido';
+      case "scheduled":
+        return "Agendada";
+      case "in_progress":
+        return "Em andamento";
+      case "completed":
+        return "Concluída";
+      case "cancelled":
+        return "Cancelada";
+      default:
+        return "Desconhecido";
     }
   };
 
-  const filteredRoutes = routes.filter(route => {
-    const matchesSearch = route.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         route.origin.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         route.driver.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = !statusFilter || route.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredRoutes =
+    routes?.filter((route: Route) => {
+      const matchesSearch =
+        (route.destination &&
+          typeof route.destination === "string" &&
+          route.destination.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (route.origin &&
+          typeof route.origin === "string" &&
+          route.origin.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (route.driver &&
+          typeof route.driver === "string" &&
+          route.driver.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (route.name &&
+          typeof route.name === "string" &&
+          route.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesStatus = !statusFilter || route.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    }) || [];
 
-  const handleEdit = (route: any) => {
+  const handleEdit = (route: Route) => {
     setEditingRoute(route);
     open();
   };
 
-  const handleDeleteClick = (route: any) => {
+  const handleDeleteClick = (route: Route) => {
     setRouteToDelete(route);
     openDeleteModal();
   };
 
-  const handleDeleteConfirm = () => {
-    if (routeToDelete) {
-      setRoutes(routes.filter(r => r.id !== routeToDelete.id));
-      setRouteToDelete(null);
-      closeDeleteModal();
+  const handleDeleteConfirm = async () => {
+    if (routeToDelete?.id) {
+      try {
+        await execute(() => apiOperations.routes.delete(routeToDelete.id!));
+        setRouteToDelete(null);
+        closeDeleteModal();
+        refetch();
+      } catch (error) {
+        alert("Erro ao excluir rota");
+      }
     }
   };
 
@@ -157,10 +132,30 @@ export default function RotasPage() {
     open();
   };
 
+  const handleSave = async (routeData: Partial<Route>) => {
+    try {
+      if (editingRoute?.id) {
+        await execute(() =>
+          apiOperations.routes.update(editingRoute.id!, routeData),
+        );
+      } else {
+        await execute(() => apiOperations.routes.create(routeData as Route));
+      }
+      close();
+      setEditingRoute(null);
+      refetch();
+    } catch (error) {
+      alert("Erro ao salvar rota");
+    }
+  };
+
   const itemsPerPage = 10;
   const totalPages = Math.ceil(filteredRoutes.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedRoutes = filteredRoutes.slice(startIndex, startIndex + itemsPerPage);
+  const paginatedRoutes = filteredRoutes.slice(
+    startIndex,
+    startIndex + itemsPerPage,
+  );
 
   return (
     <Stack gap="lg">
@@ -186,10 +181,10 @@ export default function RotasPage() {
             <Select
               placeholder="Status"
               data={[
-                { value: 'scheduled', label: 'Agendada' },
-                { value: 'in_progress', label: 'Em andamento' },
-                { value: 'completed', label: 'Concluída' },
-                { value: 'cancelled', label: 'Cancelada' },
+                { value: "scheduled", label: "Agendada" },
+                { value: "in_progress", label: "Em andamento" },
+                { value: "completed", label: "Concluída" },
+                { value: "cancelled", label: "Cancelada" },
               ]}
               value={statusFilter}
               onChange={setStatusFilter}
@@ -222,35 +217,45 @@ export default function RotasPage() {
               <Table.Tr key={route.id}>
                 <Table.Td>
                   <div>
-                    <Text fw={500}>{route.destination}</Text>
+                    <Text fw={500}>
+                      {route.destination || route.name || "Sem nome"}
+                    </Text>
                     <Group gap="xs" mt="xs">
                       <IconMapPin size="0.8rem" />
                       <Text size="xs" c="dimmed">
-                        De: {route.origin}
+                        De: {route.origin || "N/A"}
                       </Text>
                     </Group>
                     <Text size="xs" c="dimmed">
-                      R$ {route.price.toFixed(2)}
+                      R$ {route.price ? route.price.toFixed(2) : "0.00"}
                     </Text>
                   </div>
                 </Table.Td>
                 <Table.Td>
                   <Stack gap="xs">
                     <Text size="sm">
-                      {new Date(route.date).toLocaleDateString('pt-BR')}
+                      {route.date
+                        ? new Date(route.date).toLocaleDateString("pt-BR")
+                        : "N/A"}
                     </Text>
                     <Group gap="xs">
                       <IconClock size="0.8rem" />
-                      <Text size="sm">{route.time}</Text>
+                      <Text size="sm">
+                        {route.time || route.departureTime || "N/A"}
+                      </Text>
                     </Group>
                   </Stack>
                 </Table.Td>
                 <Table.Td>
                   <div>
-                    <Text size="sm" fw={500}>{route.driver}</Text>
+                    <Text size="sm" fw={500}>
+                      {route.driver || "Não atribuído"}
+                    </Text>
                     <Group gap="xs" mt="xs">
                       <IconCar size="0.8rem" />
-                      <Text size="xs" c="dimmed">{route.vehicle}</Text>
+                      <Text size="xs" c="dimmed">
+                        {route.vehicle || "Não atribuído"}
+                      </Text>
                     </Group>
                   </div>
                 </Table.Td>
@@ -258,11 +263,16 @@ export default function RotasPage() {
                   <Group gap="xs">
                     <IconUsers size="0.8rem" />
                     <Text size="sm">
-                      {route.enrolled}/{route.capacity}
+                      {route.enrolled || 0}/{route.capacity || 0}
                     </Text>
                   </Group>
                   <Text size="xs" c="dimmed">
-                    {Math.round((route.enrolled / route.capacity) * 100)}% ocupado
+                    {route.capacity
+                      ? Math.round(
+                          ((route.enrolled || 0) / route.capacity) * 100,
+                        )
+                      : 0}
+                    % ocupado
                   </Text>
                 </Table.Td>
                 <Table.Td>
@@ -281,15 +291,15 @@ export default function RotasPage() {
                       <Menu.Item leftSection={<IconEye size="0.9rem" />}>
                         Visualizar
                       </Menu.Item>
-                      <Menu.Item 
+                      <Menu.Item
                         leftSection={<IconEdit size="0.9rem" />}
                         onClick={() => handleEdit(route)}
                       >
                         Editar
                       </Menu.Item>
                       <Menu.Divider />
-                      <Menu.Item 
-                        color="red" 
+                      <Menu.Item
+                        color="red"
                         leftSection={<IconTrash size="0.9rem" />}
                         onClick={() => handleDeleteClick(route)}
                       >
@@ -315,7 +325,12 @@ export default function RotasPage() {
       </Card>
 
       {/* Modal de adicionar/editar rota */}
-      <Modal opened={opened} onClose={close} title={editingRoute ? "Editar Rota" : "Adicionar Rota"} size="lg">
+      <Modal
+        opened={opened}
+        onClose={close}
+        title={editingRoute ? "Editar Rota" : "Adicionar Rota"}
+        size="lg"
+      >
         <Stack gap="md">
           <Grid>
             <Grid.Col span={12}>
@@ -355,10 +370,10 @@ export default function RotasPage() {
                 label="Motorista"
                 placeholder="Selecione um motorista"
                 data={[
-                  { value: 'carlos', label: 'Carlos Santos Silva' },
-                  { value: 'maria', label: 'Maria Oliveira Costa' },
-                  { value: 'joao', label: 'João Pereira Lima' },
-                  { value: 'ana', label: 'Ana Paula Rodrigues' },
+                  { value: "carlos", label: "Carlos Santos Silva" },
+                  { value: "maria", label: "Maria Oliveira Costa" },
+                  { value: "joao", label: "João Pereira Lima" },
+                  { value: "ana", label: "Ana Paula Rodrigues" },
                 ]}
                 required
                 defaultValue={editingRoute?.driver}
@@ -369,10 +384,10 @@ export default function RotasPage() {
                 label="Veículo"
                 placeholder="Selecione um veículo"
                 data={[
-                  { value: 'onibus-001', label: 'Ônibus 001 (40 lugares)' },
-                  { value: 'onibus-002', label: 'Ônibus 002 (35 lugares)' },
-                  { value: 'onibus-003', label: 'Ônibus 003 (40 lugares)' },
-                  { value: 'van-001', label: 'Van 001 (15 lugares)' },
+                  { value: "onibus-001", label: "Ônibus 001 (40 lugares)" },
+                  { value: "onibus-002", label: "Ônibus 002 (35 lugares)" },
+                  { value: "onibus-003", label: "Ônibus 003 (40 lugares)" },
+                  { value: "van-001", label: "Van 001 (15 lugares)" },
                 ]}
                 required
                 defaultValue={editingRoute?.vehicle}
@@ -391,10 +406,10 @@ export default function RotasPage() {
                 label="Status"
                 placeholder="Selecione o status"
                 data={[
-                  { value: 'scheduled', label: 'Agendada' },
-                  { value: 'in_progress', label: 'Em andamento' },
-                  { value: 'completed', label: 'Concluída' },
-                  { value: 'cancelled', label: 'Cancelada' },
+                  { value: "scheduled", label: "Agendada" },
+                  { value: "in_progress", label: "Em andamento" },
+                  { value: "completed", label: "Concluída" },
+                  { value: "cancelled", label: "Cancelada" },
                 ]}
                 required
                 defaultValue={editingRoute?.status}
@@ -404,32 +419,39 @@ export default function RotasPage() {
               <Textarea
                 label="Pontos de embarque"
                 placeholder="Digite os pontos de embarque separados por vírgula"
-                defaultValue={editingRoute?.boardingPoints?.join(', ')}
+                defaultValue={editingRoute?.boardingPoints?.join(", ")}
               />
             </Grid.Col>
           </Grid>
-          
+
           <Group justify="flex-end" mt="md">
             <Button variant="light" onClick={close}>
               Cancelar
             </Button>
             <Button onClick={close}>
-              {editingRoute ? 'Salvar' : 'Adicionar'}
+              {editingRoute ? "Salvar" : "Adicionar"}
             </Button>
           </Group>
         </Stack>
       </Modal>
 
       {/* Modal de confirmação de exclusão */}
-      <Modal opened={deleteModalOpened} onClose={closeDeleteModal} title="Confirmar cancelamento">
+      <Modal
+        opened={deleteModalOpened}
+        onClose={closeDeleteModal}
+        title="Confirmar cancelamento"
+      >
         <Stack gap="md">
           <Alert icon={<IconAlertCircle size="1rem" />} color="red">
             <Text size="sm">
-              Tem certeza que deseja cancelar a rota <strong>{routeToDelete?.destination}</strong> 
+              Tem certeza que deseja cancelar a rota{" "}
+              <strong>
+                {routeToDelete?.destination || routeToDelete?.name}
+              </strong>
               do dia {routeToDelete?.date}? Esta ação não pode ser desfeita.
             </Text>
           </Alert>
-          
+
           <Group justify="flex-end">
             <Button variant="light" onClick={closeDeleteModal}>
               Cancelar

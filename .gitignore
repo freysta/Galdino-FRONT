@@ -34,3 +34,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+API_ENDPOINTS_REPORT.md
+RELATORIO_TESTES_COMPLETOS_SISTEMA.md

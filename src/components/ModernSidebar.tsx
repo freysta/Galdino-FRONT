@@ -62,7 +62,7 @@ export default function ModernSidebar({ userType }: SidebarProps) {
       icon: IconUsers,
       link: "/admin/alunos",
       description: "Gerenciar estudantes",
-      badge: "127",
+      badge: "",
     },
     {
       id: "motoristas",

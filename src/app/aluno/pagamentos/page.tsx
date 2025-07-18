@@ -1,423 +1,326 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import {
-  Title,
-  Group,
-  Stack,
-  Card,
-  Badge,
-  Text,
-  Button,
-  Grid,
-  Alert,
-  Table,
-  Select,
-  Modal,
-  Divider,
-  ActionIcon,
-} from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
-import {
-  IconCreditCard,
-  IconCheck,
-  IconClock,
-  IconX,
-  IconDownload,
-  IconEye,
-  IconAlertCircle,
-  IconInfoCircle,
-  IconReceipt,
-} from '@tabler/icons-react';
-
-// Mock data
-const mockPayments = [
-  {
-    id: 1,
-    month: '2024-01',
-    monthLabel: 'Janeiro 2024',
-    amount: 150.00,
-    dueDate: '2024-01-05',
-    paymentDate: '2024-01-03',
-    status: 'paid',
-    paymentMethod: 'PIX',
-    transactionId: 'PIX123456789',
-    description: 'Mensalidade - Campus Norte',
-  },
-  {
-    id: 2,
-    month: '2023-12',
-    monthLabel: 'Dezembro 2023',
-    amount: 150.00,
-    dueDate: '2023-12-05',
-    paymentDate: '2023-12-04',
-    status: 'paid',
-    paymentMethod: 'Cartão de Crédito',
-    transactionId: 'CC987654321',
-    description: 'Mensalidade - Campus Norte',
-  },
-  {
-    id: 3,
-    month: '2023-11',
-    monthLabel: 'Novembro 2023',
-    amount: 150.00,
-    dueDate: '2023-11-05',
-    paymentDate: '2023-11-08',
-    status: 'paid',
-    paymentMethod: 'Boleto',
-    transactionId: 'BOL456789123',
-    description: 'Mensalidade - Campus Norte',
-  },
-  {
-    id: 4,
-    month: '2024-02',
-    monthLabel: 'Fevereiro 2024',
-    amount: 150.00,
-    dueDate: '2024-02-05',
-    paymentDate: null,
-    status: 'pending',
-    paymentMethod: null,
-    transactionId: null,
-    description: 'Mensalidade - Campus Norte',
-  },
-  {
-    id: 5,
-    month: '2024-03',
-    monthLabel: 'Março 2024',
-    amount: 150.00,
-    dueDate: '2024-03-05',
-    paymentDate: null,
-    status: 'pending',
-    paymentMethod: null,
-    transactionId: null,
-    description: 'Mensalidade - Campus Norte',
-  },
-];
+import { useState } from "react";
+import { usePayments } from "@/hooks/useApiData";
+import { Payment } from "@/services/api";
 
 export default function AlunoPagamentosPage() {
-  const [opened, { open, close }] = useDisclosure(false);
-  const [payments] = useState(mockPayments);
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [selectedPayment, setSelectedPayment] = useState<any>(null);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [showModal, setShowModal] = useState(false);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'paid': return 'green';
-      case 'pending': return 'orange';
-      case 'overdue': return 'red';
-      default: return 'gray';
-    }
-  };
+  // Usar a API real
+  const { data: payments, loading, error } = usePayments();
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'paid': return 'Pago';
-      case 'pending': return 'Pendente';
-      case 'overdue': return 'Atrasado';
-      default: return 'Desconhecido';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'paid': return <IconCheck size="0.8rem" />;
-      case 'pending': return <IconClock size="0.8rem" />;
-      case 'overdue': return <IconX size="0.8rem" />;
-      default: return null;
-    }
-  };
-
-  const filteredPayments = payments.filter(payment => {
+  const filteredPayments = payments.filter((payment) => {
     const matchesStatus = !statusFilter || payment.status === statusFilter;
     return matchesStatus;
   });
 
-  const handleViewDetails = (payment: any) => {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "Pago":
+        return "bg-green-100 text-green-800";
+      case "Pendente":
+        return "bg-orange-100 text-orange-800";
+      case "Atrasado":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const handleViewDetails = (payment: Payment) => {
     setSelectedPayment(payment);
-    open();
+    setShowModal(true);
   };
 
   const handlePayment = (paymentId: number) => {
-    // Aqui seria redirecionado para o gateway de pagamento
     alert(`Redirecionando para pagamento da mensalidade ID: ${paymentId}`);
   };
 
-  // Estatísticas
-  const totalPaid = payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
-  const totalPending = payments.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0);
-  const pendingCount = payments.filter(p => p.status === 'pending').length;
+  const totalPaid = payments
+    .filter((p) => p.status === "Pago")
+    .reduce((sum, p) => sum + p.amount, 0);
+  const totalPending = payments
+    .filter((p) => p.status === "Pendente")
+    .reduce((sum, p) => sum + p.amount, 0);
+  const pendingCount = payments.filter((p) => p.status === "Pendente").length;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">
+            Erro ao carregar pagamentos: {error}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Stack gap="lg">
-      <Group justify="space-between">
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <Title order={1}>Meus Pagamentos</Title>
-          <Text c="dimmed">
+          <h1 className="text-3xl font-bold text-gray-900">Meus Pagamentos</h1>
+          <p className="text-gray-600 mt-1">
             Acompanhe suas mensalidades e histórico de pagamentos
-          </Text>
+          </p>
         </div>
-        <Button leftSection={<IconDownload size="1rem" />} variant="light">
+        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
           Exportar Comprovantes
-        </Button>
-      </Group>
+        </button>
+      </div>
 
-      {/* Alertas */}
       {pendingCount > 0 && (
-        <Alert icon={<IconAlertCircle size="1rem" />} color="orange">
-          <Text size="sm">
-            Você tem <strong>{pendingCount} mensalidade(s) pendente(s)</strong> no valor total de R$ {totalPending.toFixed(2)}. 
-            Clique em "Pagar" para regularizar sua situação.
-          </Text>
-        </Alert>
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+          <p className="text-orange-800">
+            Você tem <strong>{pendingCount} mensalidade(s) pendente(s)</strong>{" "}
+            no valor total de R$ {totalPending.toFixed(2)}. Clique em "Pagar"
+            para regularizar sua situação.
+          </p>
+        </div>
       )}
 
-      {/* Estatísticas */}
-      <Grid>
-        <Grid.Col span={{ base: 12, sm: 4 }}>
-          <Card withBorder padding="md">
-            <Group justify="space-between">
-              <div>
-                <Text size="sm" c="dimmed" mb="xs">Total Pago</Text>
-                <Text size="xl" fw={700} c="green">R$ {totalPaid.toFixed(2)}</Text>
-              </div>
-              <IconCheck size="2rem" color="green" />
-            </Group>
-          </Card>
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, sm: 4 }}>
-          <Card withBorder padding="md">
-            <Group justify="space-between">
-              <div>
-                <Text size="sm" c="dimmed" mb="xs">Pendente</Text>
-                <Text size="xl" fw={700} c="orange">R$ {totalPending.toFixed(2)}</Text>
-              </div>
-              <IconClock size="2rem" color="orange" />
-            </Group>
-          </Card>
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, sm: 4 }}>
-          <Card withBorder padding="md">
-            <Group justify="space-between">
-              <div>
-                <Text size="sm" c="dimmed" mb="xs">Mensalidade</Text>
-                <Text size="xl" fw={700}>R$ 150,00</Text>
-              </div>
-              <IconCreditCard size="2rem" color="blue" />
-            </Group>
-          </Card>
-        </Grid.Col>
-      </Grid>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Pago</p>
+              <p className="text-2xl font-bold text-green-600">
+                R$ {totalPaid.toFixed(2)}
+              </p>
+            </div>
+            <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
+              <div className="h-4 w-4 bg-green-600 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Pendente</p>
+              <p className="text-2xl font-bold text-orange-600">
+                R$ {totalPending.toFixed(2)}
+              </p>
+            </div>
+            <div className="h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center">
+              <div className="h-4 w-4 bg-orange-600 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Mensalidade</p>
+              <p className="text-2xl font-bold text-blue-600">R$ 150,00</p>
+            </div>
+            <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+              <div className="h-4 w-4 bg-blue-600 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Filtros */}
-      <Card withBorder padding="md">
-        <Grid>
-          <Grid.Col span={{ base: 12, md: 4 }}>
-            <Select
-              placeholder="Filtrar por status"
-              data={[
-                { value: 'paid', label: 'Pago' },
-                { value: 'pending', label: 'Pendente' },
-                { value: 'overdue', label: 'Atrasado' },
-              ]}
-              value={statusFilter}
-              onChange={setStatusFilter}
-              clearable
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 8 }}>
-            <Text size="sm" c="dimmed">
-              {filteredPayments.length} registro(s) encontrado(s)
-            </Text>
-          </Grid.Col>
-        </Grid>
-      </Card>
+      <div className="mb-6">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="">Todos os status</option>
+          <option value="Pago">Pago</option>
+          <option value="Pendente">Pendente</option>
+          <option value="Atrasado">Atrasado</option>
+        </select>
+        <span className="ml-4 text-sm text-gray-600">
+          {filteredPayments.length} registro(s) encontrado(s)
+        </span>
+      </div>
 
-      {/* Tabela de pagamentos */}
-      <Card withBorder padding="md">
-        <Table striped highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Mês/Ano</Table.Th>
-              <Table.Th>Valor</Table.Th>
-              <Table.Th>Vencimento</Table.Th>
-              <Table.Th>Status</Table.Th>
-              <Table.Th>Forma de Pagamento</Table.Th>
-              <Table.Th>Ações</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {filteredPayments.map((payment) => (
-              <Table.Tr key={payment.id}>
-                <Table.Td>
-                  <div>
-                    <Text fw={500}>{payment.monthLabel}</Text>
-                    <Text size="xs" c="dimmed">{payment.description}</Text>
-                  </div>
-                </Table.Td>
-                <Table.Td>
-                  <Text fw={500}>R$ {payment.amount.toFixed(2)}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm">
-                    {new Date(payment.dueDate).toLocaleDateString('pt-BR')}
-                  </Text>
-                </Table.Td>
-                <Table.Td>
-                  <Badge 
-                    color={getStatusColor(payment.status)} 
-                    variant="light"
-                    leftSection={getStatusIcon(payment.status)}
-                  >
-                    {getStatusLabel(payment.status)}
-                  </Badge>
-                </Table.Td>
-                <Table.Td>
-                  {payment.status === 'paid' ? (
-                    <div>
-                      <Text size="sm">{payment.paymentMethod}</Text>
-                      <Text size="xs" c="dimmed">
-                        {new Date(payment.paymentDate!).toLocaleDateString('pt-BR')}
-                      </Text>
+      {/* Table */}
+      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Mês/Ano
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Valor
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Forma de Pagamento
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Ações
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredPayments.map((payment) => (
+                <tr key={payment.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">
+                      {payment.month}
                     </div>
-                  ) : (
-                    <Text size="sm" c="dimmed">-</Text>
-                  )}
-                </Table.Td>
-                <Table.Td>
-                  <Group gap="xs">
-                    <ActionIcon 
-                      variant="subtle" 
-                      color="blue"
-                      onClick={() => handleViewDetails(payment)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">
+                      R$ {payment.amount.toFixed(2)}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span
+                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(payment.status)}`}
                     >
-                      <IconEye size="1rem" />
-                    </ActionIcon>
-                    {payment.status === 'paid' && (
-                      <ActionIcon variant="subtle" color="green">
-                        <IconDownload size="1rem" />
-                      </ActionIcon>
-                    )}
-                    {payment.status === 'pending' && (
-                      <Button 
-                        size="xs" 
-                        onClick={() => handlePayment(payment.id)}
-                        leftSection={<IconCreditCard size="0.8rem" />}
+                      {payment.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {payment.status === "Pago"
+                      ? payment.paymentMethod || "N/A"
+                      : "-"}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button
+                      onClick={() => handleViewDetails(payment)}
+                      className="text-blue-600 hover:text-blue-900 mr-3"
+                    >
+                      Ver Detalhes
+                    </button>
+                    {payment.status === "Pendente" && (
+                      <button
+                        onClick={() => handlePayment(payment.id!)}
+                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
                       >
                         Pagar
-                      </Button>
+                      </button>
                     )}
-                  </Group>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
-      </Card>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      {/* Informações sobre pagamento */}
-      <Card withBorder padding="lg">
-        <Group mb="md">
-          <IconInfoCircle size="1.2rem" color="blue" />
-          <Text fw={500} size="lg">Informações sobre Pagamento</Text>
-        </Group>
-        
-        <Grid>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <Stack gap="sm">
-              <Text size="sm" fw={500}>Formas de Pagamento Aceitas:</Text>
-              <Text size="sm">• PIX (desconto de 5%)</Text>
-              <Text size="sm">• Cartão de Crédito</Text>
-              <Text size="sm">• Cartão de Débito</Text>
-              <Text size="sm">• Boleto Bancário</Text>
-            </Stack>
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <Stack gap="sm">
-              <Text size="sm" fw={500}>Informações Importantes:</Text>
-              <Text size="sm">• Vencimento todo dia 5 do mês</Text>
-              <Text size="sm">• Multa de 2% após o vencimento</Text>
-              <Text size="sm">• Juros de 1% ao mês</Text>
-              <Text size="sm">• Desconto de 5% para pagamento via PIX</Text>
-            </Stack>
-          </Grid.Col>
-        </Grid>
-      </Card>
+      {/* Informações */}
+      <div className="bg-white rounded-lg shadow-sm border p-6 mt-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">
+          Informações sobre Pagamento
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">
+              Formas de Pagamento Aceitas:
+            </h4>
+            <ul className="text-sm text-gray-600 space-y-1">
+              <li>• PIX (desconto de 5%)</li>
+              <li>• Cartão de Crédito</li>
+              <li>• Cartão de Débito</li>
+              <li>• Boleto Bancário</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">
+              Informações Importantes:
+            </h4>
+            <ul className="text-sm text-gray-600 space-y-1">
+              <li>• Vencimento todo dia 5 do mês</li>
+              <li>• Multa de 2% após o vencimento</li>
+              <li>• Juros de 1% ao mês</li>
+              <li>• Desconto de 5% para pagamento via PIX</li>
+            </ul>
+          </div>
+        </div>
+      </div>
 
-      {/* Modal de detalhes */}
-      <Modal opened={opened} onClose={close} title="Detalhes do Pagamento" size="md">
-        {selectedPayment && (
-          <Stack gap="md">
-            <Grid>
-              <Grid.Col span={6}>
-                <Text size="sm" c="dimmed">Mês/Ano</Text>
-                <Text fw={500}>{selectedPayment.monthLabel}</Text>
-              </Grid.Col>
-              <Grid.Col span={6}>
-                <Text size="sm" c="dimmed">Valor</Text>
-                <Text fw={500}>R$ {selectedPayment.amount.toFixed(2)}</Text>
-              </Grid.Col>
-              <Grid.Col span={6}>
-                <Text size="sm" c="dimmed">Vencimento</Text>
-                <Text fw={500}>
-                  {new Date(selectedPayment.dueDate).toLocaleDateString('pt-BR')}
-                </Text>
-              </Grid.Col>
-              <Grid.Col span={6}>
-                <Text size="sm" c="dimmed">Status</Text>
-                <Badge 
-                  color={getStatusColor(selectedPayment.status)} 
-                  variant="light"
-                  leftSection={getStatusIcon(selectedPayment.status)}
+      {/* Modal */}
+      {showModal && selectedPayment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Detalhes do Pagamento</h2>
+
+            <div className="space-y-3">
+              <div>
+                <span className="text-sm text-gray-600">Mês/Ano:</span>
+                <p className="font-medium">{selectedPayment.month}</p>
+              </div>
+              <div>
+                <span className="text-sm text-gray-600">Valor:</span>
+                <p className="font-medium">
+                  R$ {selectedPayment.amount.toFixed(2)}
+                </p>
+              </div>
+              <div>
+                <span className="text-sm text-gray-600">Status:</span>
+                <span
+                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedPayment.status)}`}
                 >
-                  {getStatusLabel(selectedPayment.status)}
-                </Badge>
-              </Grid.Col>
-              
-              {selectedPayment.status === 'paid' && (
+                  {selectedPayment.status}
+                </span>
+              </div>
+              {selectedPayment.status === "Pago" && (
                 <>
-                  <Grid.Col span={6}>
-                    <Text size="sm" c="dimmed">Data do Pagamento</Text>
-                    <Text fw={500}>
-                      {new Date(selectedPayment.paymentDate).toLocaleDateString('pt-BR')}
-                    </Text>
-                  </Grid.Col>
-                  <Grid.Col span={6}>
-                    <Text size="sm" c="dimmed">Forma de Pagamento</Text>
-                    <Text fw={500}>{selectedPayment.paymentMethod}</Text>
-                  </Grid.Col>
-                  <Grid.Col span={12}>
-                    <Text size="sm" c="dimmed">ID da Transação</Text>
-                    <Text fw={500} ff="monospace">{selectedPayment.transactionId}</Text>
-                  </Grid.Col>
+                  <div>
+                    <span className="text-sm text-gray-600">
+                      Data do Pagamento:
+                    </span>
+                    <p className="font-medium">
+                      {selectedPayment.paymentDate
+                        ? new Date(
+                            selectedPayment.paymentDate,
+                          ).toLocaleDateString("pt-BR")
+                        : "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-sm text-gray-600">
+                      Forma de Pagamento:
+                    </span>
+                    <p className="font-medium">
+                      {selectedPayment.paymentMethod || "N/A"}
+                    </p>
+                  </div>
                 </>
               )}
-              
-              <Grid.Col span={12}>
-                <Text size="sm" c="dimmed">Descrição</Text>
-                <Text fw={500}>{selectedPayment.description}</Text>
-              </Grid.Col>
-            </Grid>
+            </div>
 
-            <Divider />
-
-            <Group justify="flex-end">
-              {selectedPayment.status === 'paid' && (
-                <Button leftSection={<IconReceipt size="1rem" />} variant="light">
-                  Baixar Comprovante
-                </Button>
-              )}
-              {selectedPayment.status === 'pending' && (
-                <Button 
-                  leftSection={<IconCreditCard size="1rem" />}
-                  onClick={() => handlePayment(selectedPayment.id)}
+            <div className="flex justify-end gap-3 pt-4">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+              >
+                Fechar
+              </button>
+              {selectedPayment.status === "Pendente" && (
+                <button
+                  onClick={() => handlePayment(selectedPayment.id!)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
                 >
                   Pagar Agora
-                </Button>
+                </button>
               )}
-            </Group>
-          </Stack>
-        )}
-      </Modal>
-    </Stack>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

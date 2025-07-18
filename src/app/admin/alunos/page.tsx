@@ -1,319 +1,397 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import { useState } from "react";
 import {
-  Title,
-  Button,
-  TextInput,
-  Group,
-  Stack,
-  Card,
-  Badge,
-  ActionIcon,
-  Modal,
-  Select,
-  Grid,
-  Text,
-  Table,
-  Pagination,
-  Menu,
-} from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
-import {
-  IconPlus,
-  IconSearch,
-  IconEdit,
-  IconTrash,
-  IconEye,
-  IconDots,
-  IconPhone,
-  IconMail,
-} from '@tabler/icons-react';
-
-// Mock data
-const mockStudents = [
-  {
-    id: 1,
-    name: 'Ana Silva Santos',
-    email: 'ana.silva@email.com',
-    phone: '(11) 99999-1111',
-    cpf: '123.456.789-01',
-    paymentStatus: 'paid',
-    route: 'Campus Norte',
-    joinDate: '2024-01-15',
-  },
-  {
-    id: 2,
-    name: 'Carlos Eduardo Lima',
-    email: 'carlos.lima@email.com',
-    phone: '(11) 99999-2222',
-    cpf: '234.567.890-12',
-    paymentStatus: 'pending',
-    route: 'Campus Sul',
-    joinDate: '2024-01-10',
-  },
-  {
-    id: 3,
-    name: 'Mariana Costa Oliveira',
-    email: 'mariana.costa@email.com',
-    phone: '(11) 99999-3333',
-    cpf: '345.678.901-23',
-    paymentStatus: 'overdue',
-    route: 'Centro',
-    joinDate: '2023-12-20',
-  },
-  {
-    id: 4,
-    name: 'Pedro Henrique Souza',
-    email: 'pedro.souza@email.com',
-    phone: '(11) 99999-4444',
-    cpf: '456.789.012-34',
-    paymentStatus: 'paid',
-    route: 'Campus Norte',
-    joinDate: '2024-01-08',
-  },
-  {
-    id: 5,
-    name: 'Juliana Ferreira',
-    email: 'juliana.ferreira@email.com',
-    phone: '(11) 99999-5555',
-    cpf: '567.890.123-45',
-    paymentStatus: 'paid',
-    route: 'Campus Sul',
-    joinDate: '2024-01-12',
-  },
-];
+  useStudents,
+  useApiOperations,
+  apiOperations,
+} from "@/hooks/useApiData";
+import { Student } from "@/services/api";
 
 export default function AlunosPage() {
-  const [opened, { open, close }] = useDisclosure(false);
-  const [students, setStudents] = useState(mockStudents);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [editingStudent, setEditingStudent] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'paid': return 'green';
-      case 'pending': return 'yellow';
-      case 'overdue': return 'red';
-      default: return 'gray';
-    }
-  };
+  // Usar a API real
+  const { data: students, loading, error, refetch } = useStudents();
+  const { execute, loading: operationLoading } = useApiOperations();
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'paid': return 'Pago';
-      case 'pending': return 'Pendente';
-      case 'overdue': return 'Atrasado';
-      default: return 'Desconhecido';
-    }
-  };
+  const filteredStudents = students.filter(
+    (student) =>
+      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.email.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
 
-  const filteredStudents = students.filter(student => {
-    const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.cpf.includes(searchTerm);
-    const matchesStatus = !statusFilter || student.paymentStatus === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  const handleEdit = (student: any) => {
+  const handleEdit = (student: Student) => {
     setEditingStudent(student);
-    open();
+    setShowModal(true);
   };
 
-  const handleDelete = (studentId: number) => {
-    // Confirmation modal can be implemented here if needed
-    setStudents(students.filter(s => s.id !== studentId));
+  const handleDelete = async (id: number) => {
+    if (confirm("Tem certeza que deseja excluir este aluno?")) {
+      try {
+        await execute(() => apiOperations.students.delete(id));
+        refetch();
+      } catch (error) {
+        alert("Erro ao excluir aluno");
+      }
+    }
   };
 
-  const handleAddNew = () => {
-    setEditingStudent(null);
-    open();
+  const handleSave = async (studentData: Partial<Student>) => {
+    try {
+      if (editingStudent?.id) {
+        await execute(() =>
+          apiOperations.students.update(editingStudent.id!, studentData),
+        );
+      } else {
+        await execute(() =>
+          apiOperations.students.create(studentData as Student),
+        );
+      }
+      setShowModal(false);
+      setEditingStudent(null);
+      refetch();
+    } catch (error) {
+      alert("Erro ao salvar aluno");
+    }
   };
 
-  const itemsPerPage = 10;
-  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedStudents = filteredStudents.slice(startIndex, startIndex + itemsPerPage);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Erro ao carregar alunos: {error}</p>
+          <button
+            onClick={refetch}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Tentar Novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Stack gap="lg">
-      <Group justify="space-between">
-        <Title order={1}>Gerenciar Alunos</Title>
-        <Button leftSection={<IconPlus size="1rem" />} onClick={handleAddNew}>
-          Adicionar Aluno
-        </Button>
-      </Group>
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Alunos</h1>
+          <p className="text-gray-600 mt-1">Gerencie os alunos cadastrados</p>
+        </div>
+        <button
+          onClick={() => {
+            setEditingStudent(null);
+            setShowModal(true);
+          }}
+          disabled={operationLoading}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+        >
+          + Novo Aluno
+        </button>
+      </div>
 
-      {/* Filtros */}
-      <Card withBorder padding="md">
-        <Grid>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <TextInput
-              placeholder="Buscar por nome, email ou CPF..."
-              leftSection={<IconSearch size="1rem" />}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 3 }}>
-            <Select
-              placeholder="Status do pagamento"
-              data={[
-                { value: 'paid', label: 'Pago' },
-                { value: 'pending', label: 'Pendente' },
-                { value: 'overdue', label: 'Atrasado' },
-              ]}
-              value={statusFilter}
-              onChange={setStatusFilter}
-              clearable
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 3 }}>
-            <Text size="sm" c="dimmed">
-              {filteredStudents.length} aluno(s) encontrado(s)
-            </Text>
-          </Grid.Col>
-        </Grid>
-      </Card>
+      {/* Search */}
+      <div className="mb-6">
+        <input
+          type="text"
+          placeholder="Buscar por nome ou email..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
 
-      {/* Tabela de alunos */}
-      <Card withBorder padding="md">
-        <Table striped highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Nome</Table.Th>
-              <Table.Th>Contato</Table.Th>
-              <Table.Th>CPF</Table.Th>
-              <Table.Th>Rota</Table.Th>
-              <Table.Th>Status Pagamento</Table.Th>
-              <Table.Th>Ações</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {paginatedStudents.map((student) => (
-              <Table.Tr key={student.id}>
-                <Table.Td>
-                  <div>
-                    <Text fw={500}>{student.name}</Text>
-                    <Text size="xs" c="dimmed">
-                      Desde {new Date(student.joinDate).toLocaleDateString('pt-BR')}
-                    </Text>
-                  </div>
-                </Table.Td>
-                <Table.Td>
-                  <Stack gap="xs">
-                    <Group spacing="xs">
-                      <IconMail size="0.8rem" />
-                      <Text size="sm">{student.email}</Text>
-                    </Group>
-                    <Group spacing="xs">
-                      <IconPhone size="0.8rem" />
-                      <Text size="sm">{student.phone}</Text>
-                    </Group>
-                  </Stack>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm" ff="monospace">{student.cpf}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Badge variant="light" color="blue">
-                    {student.route}
-                  </Badge>
-                </Table.Td>
-                <Table.Td>
-                  <Badge color={getStatusColor(student.paymentStatus)} variant="light">
-                    {getStatusLabel(student.paymentStatus)}
-                  </Badge>
-                </Table.Td>
-                <Table.Td>
-                  <Group spacing="xs" noWrap>
-                    <ActionIcon color="blue" variant="light" onClick={() => handleEdit(student)}>
-                      <IconEdit size={16} />
-                    </ActionIcon>
-                    <ActionIcon color="red" variant="light" onClick={() => handleDelete(student.id)}>
-                      <IconTrash size={16} />
-                    </ActionIcon>
-                    <ActionIcon color="gray" variant="light">
-                      <IconEye size={16} />
-                    </ActionIcon>
-                  </Group>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {students.length}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Manhã</p>
+              <p className="text-2xl font-bold text-orange-600">
+                {students.filter((s) => s.shift === "Manha").length}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Resultados</p>
+              <p className="text-2xl font-bold text-green-600">
+                {filteredStudents.length}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        {totalPages > 1 && (
-          <Group position="center" mt="md">
-            <Pagination page={currentPage} onChange={setCurrentPage} total={totalPages} />
-          </Group>
-        )}
-      </Card>
+      {/* Table */}
+      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Aluno
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Email
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Telefone
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Turno
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Ações
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredStudents.map((student) => (
+                <tr key={student.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">
+                      {student.name}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {student.email}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {student.phone || "Não informado"}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                      {student.shift || "Não informado"}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button
+                      onClick={() => handleEdit(student)}
+                      className="text-blue-600 hover:text-blue-900 mr-3"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleDelete(student.id!)}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      Excluir
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      {/* Modal de adicionar/editar aluno */}
-      <Modal opened={opened} onClose={close} title={editingStudent ? "Editar Aluno" : "Adicionar Aluno"} size="lg">
-        <Stack gap="md">
-          <Grid>
-            <Grid.Col span={12}>
-              <TextInput
-                label="Nome completo"
-                placeholder="Digite o nome completo"
+      {/* Modal */}
+      {showModal && (
+        <StudentModal
+          student={editingStudent}
+          onSave={handleSave}
+          onClose={() => {
+            setShowModal(false);
+            setEditingStudent(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+interface StudentModalProps {
+  student: Student | null;
+  onSave: (data: Partial<Student>) => void;
+  onClose: () => void;
+}
+
+function StudentModal({ student, onSave, onClose }: StudentModalProps) {
+  const [formData, setFormData] = useState({
+    name: student?.name || "",
+    email: student?.email || "",
+    phone: student?.phone || "",
+    cpf: student?.cpf || "",
+    address: student?.address || "",
+    city: student?.city || "",
+    course: student?.course || "",
+    shift: student?.shift || "Manha",
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <h2 className="text-xl font-bold mb-4">
+          {student ? "Editar Aluno" : "Novo Aluno"}
+        </h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nome Completo *
+              </label>
+              <input
+                type="text"
                 required
-                defaultValue={editingStudent?.name}
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <TextInput
-                label="Email"
-                placeholder="email@exemplo.com"
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email *
+              </label>
+              <input
+                type="email"
                 required
-                defaultValue={editingStudent?.email}
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <TextInput
-                label="Telefone"
-                placeholder="(11) 99999-9999"
-                required
-                defaultValue={editingStudent?.phone}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Telefone
+              </label>
+              <input
+                type="text"
+                value={formData.phone}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <TextInput
-                label="CPF"
-                placeholder="000.000.000-00"
-                required
-                defaultValue={editingStudent?.cpf}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                CPF
+              </label>
+              <input
+                type="text"
+                value={formData.cpf}
+                onChange={(e) =>
+                  setFormData({ ...formData, cpf: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <Select
-                label="Rota"
-                placeholder="Selecione uma rota"
-                data={[
-                  { value: 'campus-norte', label: 'Campus Norte' },
-                  { value: 'campus-sul', label: 'Campus Sul' },
-                  { value: 'centro', label: 'Centro' },
-                ]}
-                required
-                defaultValue={editingStudent?.route}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Endereço
+              </label>
+              <input
+                type="text"
+                value={formData.address}
+                onChange={(e) =>
+                  setFormData({ ...formData, address: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-            </Grid.Col>
-          </Grid>
-          
-          <Group justify="flex-end" mt="md">
-            <Button variant="light" onClick={close}>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cidade
+              </label>
+              <input
+                type="text"
+                value={formData.city}
+                onChange={(e) =>
+                  setFormData({ ...formData, city: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Curso
+              </label>
+              <input
+                type="text"
+                value={formData.course}
+                onChange={(e) =>
+                  setFormData({ ...formData, course: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Turno
+              </label>
+              <select
+                value={formData.shift}
+                onChange={(e) =>
+                  setFormData({ ...formData, shift: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="Manha">Manhã</option>
+                <option value="Tarde">Tarde</option>
+                <option value="Noite">Noite</option>
+                <option value="Integral">Integral</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+            >
               Cancelar
-            </Button>
-            <Button onClick={close}>
-              {editingStudent ? 'Salvar' : 'Adicionar'}
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
-    </Stack>
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              {student ? "Atualizar" : "Criar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
