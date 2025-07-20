@@ -2,21 +2,24 @@
 
 import { useState } from "react";
 import {
-  Container,
   Title,
-  Paper,
-  Table,
   Button,
-  Group,
   TextInput,
-  Modal,
+  Group,
   Stack,
+  Card,
   ActionIcon,
-  Menu,
-  Text,
-  Alert,
+  Modal,
   Grid,
+  Text,
+  Table,
+  Pagination,
+  Menu,
+  Loader,
+  Alert,
 } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
 import {
   IconPlus,
   IconSearch,
@@ -24,107 +27,54 @@ import {
   IconTrash,
   IconDots,
   IconBuilding,
+  IconMapPin,
   IconPhone,
+  IconAlertCircle,
 } from "@tabler/icons-react";
-import { notifications } from "@mantine/notifications";
+
 import {
   useInstitutions,
   useCreateInstitution,
   useUpdateInstitution,
   useDeleteInstitution,
+  type Institution,
 } from "@/hooks/useApi";
-import { Institution } from "@/services/api";
 
-interface InstitutionForm {
-  nome: string;
-  cidade: string;
-  endereco?: string;
-  telefone?: string;
-  cep?: string;
-}
-
-export default function InstitutionsPage() {
-  const [opened, setOpened] = useState(false);
+export default function InstituicoesPage() {
+  const [opened, { open, close }] = useDisclosure(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [editingInstitution, setEditingInstitution] =
     useState<Institution | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [formData, setFormData] = useState<InstitutionForm>({
-    nome: "",
-    cidade: "",
-    endereco: "",
-    telefone: "",
-    cep: "",
-  });
 
-  // Usar React Query hooks
   const { data: institutions = [], isLoading, error } = useInstitutions();
-  const createInstitutionMutation = useCreateInstitution();
-  const updateInstitutionMutation = useUpdateInstitution();
-  const deleteInstitutionMutation = useDeleteInstitution();
+  const createMutation = useCreateInstitution();
+  const updateMutation = useUpdateInstitution();
+  const deleteMutation = useDeleteInstitution();
 
-  // Garantir que institutions é um array
   const institutionsArray = Array.isArray(institutions) ? institutions : [];
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.nome || !formData.cidade) {
-      notifications.show({
-        title: "Erro",
-        message: "Nome e cidade são obrigatórios",
-        color: "red",
-      });
-      return;
-    }
-
-    try {
-      if (editingInstitution) {
-        await updateInstitutionMutation.mutateAsync({
-          id: editingInstitution.id!,
-          data: formData,
-        });
-        notifications.show({
-          title: "Sucesso",
-          message: "Instituição atualizada com sucesso",
-          color: "green",
-        });
-      } else {
-        await createInstitutionMutation.mutateAsync(formData as Institution);
-        notifications.show({
-          title: "Sucesso",
-          message: "Instituição criada com sucesso",
-          color: "green",
-        });
-      }
-      handleCloseModal();
-    } catch {
-      notifications.show({
-        title: "Erro",
-        message: "Erro ao salvar instituição",
-        color: "red",
-      });
-    }
-  };
+  const filteredInstitutions = institutionsArray.filter(
+    (institution: Institution) => {
+      const matchesSearch =
+        institution.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        institution.cidade?.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesSearch;
+    },
+  );
 
   const handleEdit = (institution: Institution) => {
     setEditingInstitution(institution);
-    setFormData({
-      nome: institution.nome || "",
-      cidade: institution.cidade || "",
-      endereco: institution.endereco || "",
-      telefone: institution.telefone || "",
-      cep: institution.cep || "",
-    });
-    setOpened(true);
+    open();
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm("Tem certeza que deseja excluir esta instituição?")) {
+    if (confirm("Tem certeza que deseja excluir esta instituição?")) {
       try {
-        await deleteInstitutionMutation.mutateAsync(id);
+        await deleteMutation.mutateAsync(id);
         notifications.show({
           title: "Sucesso",
-          message: "Instituição excluída com sucesso",
+          message: "Instituição excluída com sucesso!",
           color: "green",
         });
       } catch {
@@ -137,33 +87,72 @@ export default function InstitutionsPage() {
     }
   };
 
-  const handleCloseModal = () => {
-    setOpened(false);
+  const handleSave = async (formData: FormData) => {
+    try {
+      const institutionData = {
+        nome: formData.get("nome") as string,
+        cidade: formData.get("cidade") as string,
+        endereco: formData.get("endereco") as string,
+        telefone: formData.get("telefone") as string,
+        cep: formData.get("cep") as string,
+      };
+
+      if (editingInstitution?.id) {
+        await updateMutation.mutateAsync({
+          id: editingInstitution.id,
+          data: institutionData,
+        });
+        notifications.show({
+          title: "Sucesso",
+          message: "Instituição atualizada com sucesso!",
+          color: "green",
+        });
+      } else {
+        await createMutation.mutateAsync(institutionData);
+        notifications.show({
+          title: "Sucesso",
+          message: "Instituição criada com sucesso!",
+          color: "green",
+        });
+      }
+      close();
+      setEditingInstitution(null);
+    } catch {
+      notifications.show({
+        title: "Erro",
+        message: "Erro ao salvar instituição",
+        color: "red",
+      });
+    }
+  };
+
+  const handleAddNew = () => {
     setEditingInstitution(null);
-    setFormData({
-      nome: "",
-      cidade: "",
-      endereco: "",
-      telefone: "",
-      cep: "",
-    });
+    open();
   };
 
   const isOperationLoading =
-    createInstitutionMutation.isPending ||
-    updateInstitutionMutation.isPending ||
-    deleteInstitutionMutation.isPending;
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending;
 
-  const filteredInstitutions = institutionsArray.filter(
-    (institution: Institution) =>
-      institution.nome?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      institution.cidade?.toLowerCase().includes(searchQuery.toLowerCase()),
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(filteredInstitutions.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedInstitutions = filteredInstitutions.slice(
+    startIndex,
+    startIndex + itemsPerPage,
   );
+
+  const totalInstitutions = institutionsArray.length;
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <Loader size="lg" />
+          <Text mt="md">Carregando instituições...</Text>
+        </div>
       </div>
     );
   }
@@ -172,7 +161,9 @@ export default function InstitutionsPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <p className="text-red-600 mb-4">Erro ao carregar instituições</p>
+          <Alert icon={<IconAlertCircle size="1rem" />} color="red" mb="md">
+            <Text size="sm">Erro ao carregar instituições</Text>
+          </Alert>
           <Button onClick={() => window.location.reload()}>
             Tentar Novamente
           </Button>
@@ -182,75 +173,103 @@ export default function InstitutionsPage() {
   }
 
   return (
-    <Container size="xl">
-      <Title order={2} mb="xl">
-        Instituições
-      </Title>
+    <Stack gap="lg">
+      <Group justify="space-between">
+        <div>
+          <Title order={1}>Gerenciar Instituições</Title>
+          <Text c="dimmed" mt="xs">
+            Cadastro e controle das instituições de ensino
+          </Text>
+        </div>
+        <Button
+          leftSection={<IconPlus size="1rem" />}
+          onClick={handleAddNew}
+          disabled={isOperationLoading}
+        >
+          Nova Instituição
+        </Button>
+      </Group>
 
-      <Paper shadow="sm" p="md" withBorder>
-        <Group justify="space-between" mb="md">
-          <TextInput
-            placeholder="Buscar por nome ou cidade..."
-            leftSection={<IconSearch size={16} />}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.currentTarget.value)}
-            style={{ flex: 1, maxWidth: 400 }}
-          />
-          <Button
-            leftSection={<IconPlus size={16} />}
-            onClick={() => setOpened(true)}
-            disabled={isOperationLoading}
-          >
-            Nova Instituição
-          </Button>
-        </Group>
+      <Grid>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Card withBorder padding="md">
+            <Group justify="space-between">
+              <div>
+                <Text size="sm" c="dimmed">
+                  Total de Instituições
+                </Text>
+                <Text size="xl" fw={700}>
+                  {totalInstitutions}
+                </Text>
+              </div>
+              <IconBuilding size="2rem" color="blue" />
+            </Group>
+          </Card>
+        </Grid.Col>
+      </Grid>
 
-        <div style={{ position: "relative", minHeight: 400 }}>
-          {filteredInstitutions.length === 0 && (
-            <Alert color="gray" mt="md">
-              {searchQuery
-                ? "Nenhuma instituição encontrada"
-                : "Nenhuma instituição cadastrada"}
-            </Alert>
-          )}
+      <Card withBorder padding="md">
+        <Grid>
+          <Grid.Col span={{ base: 12, md: 8 }}>
+            <TextInput
+              placeholder="Buscar por nome ou cidade..."
+              leftSection={<IconSearch size="1rem" />}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 4 }}>
+            <Text size="sm" c="dimmed">
+              {filteredInstitutions.length} registro(s)
+            </Text>
+          </Grid.Col>
+        </Grid>
+      </Card>
 
-          {filteredInstitutions.length > 0 && (
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Nome</Table.Th>
-                  <Table.Th>Cidade</Table.Th>
-                  <Table.Th>Telefone</Table.Th>
-                  <Table.Th style={{ width: 80 }}>Ações</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {filteredInstitutions.map((institution: Institution) => (
+      <Card withBorder padding="md">
+        <div className="overflow-x-auto">
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Instituição</Table.Th>
+                <Table.Th>Localização</Table.Th>
+                <Table.Th>Contato</Table.Th>
+                <Table.Th>Ações</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {paginatedInstitutions.length > 0 ? (
+                paginatedInstitutions.map((institution: Institution) => (
                   <Table.Tr key={institution.id}>
                     <Table.Td>
-                      <Group gap="xs">
-                        <IconBuilding size={16} />
-                        <div>
-                          <Text fw={500}>
-                            {institution.nome || "Nome não informado"}
-                          </Text>
-                          <Text size="sm" c="dimmed">
-                            {institution.endereco || "Endereço não informado"}
-                          </Text>
-                        </div>
-                      </Group>
+                      <div>
+                        <Text fw={500}>
+                          {institution.nome || "Nome não informado"}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          ID: {institution.id || "N/A"}
+                        </Text>
+                      </div>
                     </Table.Td>
                     <Table.Td>
-                      <Text>
-                        {institution.cidade || "Cidade não informada"}
-                      </Text>
-                      <Text size="sm" c="dimmed">
-                        CEP: {institution.cep || "Não informado"}
-                      </Text>
+                      <Stack gap="xs">
+                        <Group gap="xs">
+                          <IconMapPin size="0.8rem" />
+                          <Text size="sm">
+                            {institution.cidade || "Cidade não informada"}
+                          </Text>
+                        </Group>
+                        <Text size="xs" c="dimmed">
+                          {institution.endereco || "Endereço não informado"}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          CEP: {institution.cep || "Não informado"}
+                        </Text>
+                      </Stack>
                     </Table.Td>
                     <Table.Td>
                       <Group gap="xs">
-                        <IconPhone size={14} />
+                        <IconPhone size="0.8rem" />
                         <Text size="sm">
                           {institution.telefone || "Não informado"}
                         </Text>
@@ -259,20 +278,20 @@ export default function InstitutionsPage() {
                     <Table.Td>
                       <Menu shadow="md" width={200}>
                         <Menu.Target>
-                          <ActionIcon variant="subtle">
-                            <IconDots size={16} />
+                          <ActionIcon variant="subtle" color="gray">
+                            <IconDots size="1rem" />
                           </ActionIcon>
                         </Menu.Target>
                         <Menu.Dropdown>
                           <Menu.Item
-                            leftSection={<IconEdit size={14} />}
+                            leftSection={<IconEdit size="0.9rem" />}
                             onClick={() => handleEdit(institution)}
                           >
                             Editar
                           </Menu.Item>
                           <Menu.Item
                             color="red"
-                            leftSection={<IconTrash size={14} />}
+                            leftSection={<IconTrash size="0.9rem" />}
                             onClick={() => handleDelete(institution.id!)}
                           >
                             Excluir
@@ -281,88 +300,103 @@ export default function InstitutionsPage() {
                       </Menu>
                     </Table.Td>
                   </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          )}
+                ))
+              ) : (
+                <Table.Tr>
+                  <Table.Td colSpan={4} style={{ textAlign: "center" }}>
+                    <Text c="dimmed">
+                      {searchTerm
+                        ? "Nenhuma instituição encontrada"
+                        : "Nenhuma instituição cadastrada"}
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+            </Table.Tbody>
+          </Table>
         </div>
-      </Paper>
+
+        {totalPages > 1 && (
+          <Group justify="center" mt="md">
+            <Pagination
+              value={currentPage}
+              onChange={setCurrentPage}
+              total={totalPages}
+            />
+          </Group>
+        )}
+      </Card>
 
       <Modal
         opened={opened}
-        onClose={handleCloseModal}
+        onClose={close}
         title={editingInstitution ? "Editar Instituição" : "Nova Instituição"}
         size="lg"
       >
-        <form onSubmit={handleSubmit}>
-          <Stack>
-            <TextInput
-              label="Nome da Instituição"
-              placeholder="Ex: Universidade Federal"
-              required
-              value={formData.nome}
-              onChange={(e) =>
-                setFormData({ ...formData, nome: e.target.value })
-              }
-            />
-
-            <TextInput
-              label="Cidade"
-              placeholder="Ex: São Paulo"
-              required
-              value={formData.cidade}
-              onChange={(e) =>
-                setFormData({ ...formData, cidade: e.target.value })
-              }
-            />
-
-            <TextInput
-              label="Endereço"
-              placeholder="Ex: Rua Principal, 123"
-              value={formData.endereco}
-              onChange={(e) =>
-                setFormData({ ...formData, endereco: e.target.value })
-              }
-            />
-
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.currentTarget);
+            handleSave(formData);
+          }}
+        >
+          <Stack gap="md">
             <Grid>
-              <Grid.Col span={6}>
+              <Grid.Col span={12}>
                 <TextInput
-                  label="Telefone"
-                  placeholder="(00) 0000-0000"
-                  value={formData.telefone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, telefone: e.target.value })
-                  }
+                  label="Nome da Instituição"
+                  placeholder="Digite o nome da instituição"
+                  name="nome"
+                  required
+                  defaultValue={editingInstitution?.nome}
                 />
               </Grid.Col>
-              <Grid.Col span={6}>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="Cidade"
+                  placeholder="Digite a cidade"
+                  name="cidade"
+                  required
+                  defaultValue={editingInstitution?.cidade}
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
                 <TextInput
                   label="CEP"
                   placeholder="00000-000"
-                  value={formData.cep}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cep: e.target.value })
-                  }
+                  name="cep"
+                  defaultValue={editingInstitution?.cep}
+                />
+              </Grid.Col>
+              <Grid.Col span={12}>
+                <TextInput
+                  label="Endereço"
+                  placeholder="Rua, número, bairro"
+                  name="endereco"
+                  defaultValue={editingInstitution?.endereco}
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="Telefone"
+                  placeholder="(00) 00000-0000"
+                  name="telefone"
+                  defaultValue={editingInstitution?.telefone}
                 />
               </Grid.Col>
             </Grid>
 
             <Group justify="flex-end" mt="md">
-              <Button
-                variant="subtle"
-                onClick={handleCloseModal}
-                disabled={isOperationLoading}
-              >
+              <Button variant="light" onClick={close} type="button">
                 Cancelar
               </Button>
               <Button type="submit" loading={isOperationLoading}>
-                {editingInstitution ? "Atualizar" : "Criar"}
+                {editingInstitution ? "Salvar" : "Criar"}
               </Button>
             </Group>
           </Stack>
         </form>
       </Modal>
-    </Container>
+    </Stack>
   );
 }

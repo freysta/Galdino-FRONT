@@ -27,6 +27,8 @@ import {
   IconUser,
   IconSwitchHorizontal,
   IconChevronRight,
+  IconAlertTriangle,
+  IconSettings,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -39,7 +41,7 @@ interface SidebarProps {
 interface MenuItem {
   id: string;
   label: string;
-  icon: any;
+  icon: React.ComponentType<any>;
   link: string;
   description: string;
   badge?: string;
@@ -125,6 +127,20 @@ export default function ModernSidebar({
       icon: IconUser,
       link: "/admin/usuarios",
       description: "Gerenciar usuários",
+    },
+    {
+      id: "emergencias",
+      label: "Emergências",
+      icon: IconAlertTriangle,
+      link: "/admin/emergencias",
+      description: "Situações de emergência",
+    },
+    {
+      id: "configuracoes",
+      label: "Configurações",
+      icon: IconSettings,
+      link: "/admin/configuracoes",
+      description: "Configurações do sistema",
     },
   ];
 

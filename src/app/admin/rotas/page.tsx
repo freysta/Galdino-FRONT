@@ -18,8 +18,10 @@ import {
   Pagination,
   Menu,
   Alert,
+  Loader,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
 import {
   IconPlus,
   IconSearch,
@@ -29,88 +31,42 @@ import {
   IconDots,
   IconClock,
   IconMapPin,
-  IconUsers,
   IconAlertCircle,
   IconCar,
+  IconRoute,
+  IconCheck,
 } from "@tabler/icons-react";
-import { notifications } from "@mantine/notifications";
+
 import {
   useRoutes,
   useCreateRoute,
   useUpdateRoute,
   useDeleteRoute,
   useDrivers,
-  useBuses,
-  useInstitutions,
+  type Route,
+  type Driver,
 } from "@/hooks/useApi";
-import { Route, Driver, Bus, Institution } from "@/services/api";
-
-interface RouteForm {
-  name?: string;
-  destination: string;
-  origin: string;
-  date?: string;
-  time?: string;
-  departureTime: string;
-  driver?: string;
-  vehicle?: string;
-  price?: number;
-  capacity?: number;
-  status: string;
-  boardingPoints?: string[];
-}
 
 export default function RotasPage() {
   const [opened, { open, close }] = useDisclosure(false);
-  const [
-    deleteModalOpened,
-    { open: openDeleteModal, close: closeDeleteModal },
-  ] = useDisclosure(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
-  const [routeToDelete, setRouteToDelete] = useState<Route | null>(null);
-  const [formData, setFormData] = useState<RouteForm>({
-    destination: "",
-    origin: "",
-    departureTime: "",
-    status: "scheduled",
-  });
 
-  // Usar React Query hooks
   const { data: routes = [], isLoading, error } = useRoutes();
-  const { data: drivers = [], isLoading: driversLoading } = useDrivers();
-  const { data: buses = [], isLoading: busesLoading } = useBuses();
-  const { data: institutions = [], isLoading: institutionsLoading } =
-    useInstitutions();
-  const createRouteMutation = useCreateRoute();
-  const updateRouteMutation = useUpdateRoute();
-  const deleteRouteMutation = useDeleteRoute();
+  const { data: drivers = [] } = useDrivers();
+  const createMutation = useCreateRoute();
+  const updateMutation = useUpdateRoute();
+  const deleteMutation = useDeleteRoute();
 
-  // Garantir que todos são arrays
   const routesArray = Array.isArray(routes) ? routes : [];
   const driversArray = Array.isArray(drivers) ? drivers : [];
-  const busesArray = Array.isArray(buses) ? buses : [];
-  const institutionsArray = Array.isArray(institutions) ? institutions : [];
 
-  // Preparar dados para selects
   const driversSelectData = driversArray.map((driver: Driver) => ({
     value: driver.id?.toString() || "",
     label: driver.name || `Motorista #${driver.id}`,
   }));
-
-  const busesSelectData = busesArray.map((bus: Bus) => ({
-    value: bus.id?.toString() || "",
-    label: `${bus.modelo} - ${bus.placa}` || `Ônibus #${bus.id}`,
-  }));
-
-  const institutionsSelectData = institutionsArray.map(
-    (institution: Institution) => ({
-      value: institution.id?.toString() || "",
-      label: institution.nome || `Instituição #${institution.id}`,
-    }),
-  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -154,39 +110,18 @@ export default function RotasPage() {
 
   const handleEdit = (route: Route) => {
     setEditingRoute(route);
-    setFormData({
-      name: route.name || "",
-      destination: route.destination || "",
-      origin: route.origin || "",
-      date: route.date || "",
-      time: route.time || "",
-      departureTime: route.departureTime || "",
-      driver: route.driver || "",
-      vehicle: route.vehicle || "",
-      price: route.price || 0,
-      capacity: route.capacity || 0,
-      status: route.status || "scheduled",
-      boardingPoints: route.boardingPoints || [],
-    });
     open();
   };
 
-  const handleDeleteClick = (route: Route) => {
-    setRouteToDelete(route);
-    openDeleteModal();
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (routeToDelete?.id) {
+  const handleDelete = async (id: number) => {
+    if (confirm("Tem certeza que deseja cancelar esta rota?")) {
       try {
-        await deleteRouteMutation.mutateAsync(routeToDelete.id);
+        await deleteMutation.mutateAsync(id);
         notifications.show({
           title: "Sucesso",
           message: "Rota cancelada com sucesso!",
           color: "green",
         });
-        setRouteToDelete(null);
-        closeDeleteModal();
       } catch {
         notifications.show({
           title: "Erro",
@@ -197,54 +132,27 @@ export default function RotasPage() {
     }
   };
 
-  const handleAddNew = () => {
-    setEditingRoute(null);
-    setFormData({
-      destination: "",
-      origin: "",
-      departureTime: "",
-      status: "scheduled",
-    });
-    open();
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.destination || !formData.departureTime) {
-      notifications.show({
-        title: "Erro",
-        message: "Destino e horário são obrigatórios",
-        color: "red",
-      });
-      return;
-    }
-
+  const handleSave = async (formData: FormData) => {
     try {
-      // Usar estrutura original da API que funciona
       const routeData = {
-        date: formData.date || new Date().toISOString().split("T")[0],
-        destination: formData.destination as "Ida" | "Volta" | "Circular",
-        departureTime: formData.departureTime,
-        status: (() => {
-          switch (formData.status) {
-            case "scheduled":
-              return "Planejada";
-            case "in_progress":
-              return "EmAndamento";
-            case "completed":
-              return "Concluida";
-            case "cancelled":
-              return "Cancelada";
-            default:
-              return "Planejada";
-          }
-        })() as "Planejada" | "EmAndamento" | "Concluida" | "Cancelada",
-        driverId: parseInt(formData.driver || "1"),
+        date:
+          (formData.get("date") as string) ||
+          new Date().toISOString().split("T")[0],
+        destination: formData.get("destination") as
+          | "Ida"
+          | "Volta"
+          | "Circular",
+        departureTime: formData.get("departureTime") as string,
+        status: formData.get("status") as
+          | "Planejada"
+          | "EmAndamento"
+          | "Concluida"
+          | "Cancelada",
+        driverId: parseInt(formData.get("driverId") as string),
       };
 
       if (editingRoute?.id) {
-        await updateRouteMutation.mutateAsync({
+        await updateMutation.mutateAsync({
           id: editingRoute.id,
           data: routeData,
         });
@@ -254,7 +162,7 @@ export default function RotasPage() {
           color: "green",
         });
       } else {
-        await createRouteMutation.mutateAsync(routeData);
+        await createMutation.mutateAsync(routeData);
         notifications.show({
           title: "Sucesso",
           message: "Rota criada com sucesso!",
@@ -263,27 +171,24 @@ export default function RotasPage() {
       }
       close();
       setEditingRoute(null);
-      // Resetar formData após salvar
-      setFormData({
-        destination: "",
-        origin: "",
-        departureTime: "",
-        status: "scheduled",
-      });
-    } catch (error) {
-      console.error("Erro ao salvar rota:", error);
+    } catch {
       notifications.show({
         title: "Erro",
-        message: "Erro ao salvar rota. Verifique os dados e tente novamente.",
+        message: "Erro ao salvar rota",
         color: "red",
       });
     }
   };
 
+  const handleAddNew = () => {
+    setEditingRoute(null);
+    open();
+  };
+
   const isOperationLoading =
-    createRouteMutation.isPending ||
-    updateRouteMutation.isPending ||
-    deleteRouteMutation.isPending;
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending;
 
   const itemsPerPage = 10;
   const totalPages = Math.ceil(filteredRoutes.length / itemsPerPage);
@@ -293,10 +198,24 @@ export default function RotasPage() {
     startIndex + itemsPerPage,
   );
 
+  const totalRoutes = routesArray.length;
+  const plannedRoutes = routesArray.filter(
+    (r: Route) => r.status === "Planejada",
+  ).length;
+  const inProgressRoutes = routesArray.filter(
+    (r: Route) => r.status === "EmAndamento",
+  ).length;
+  const completedRoutes = routesArray.filter(
+    (r: Route) => r.status === "Concluida",
+  ).length;
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <Loader size="lg" />
+          <Text mt="md">Carregando rotas...</Text>
+        </div>
       </div>
     );
   }
@@ -305,7 +224,9 @@ export default function RotasPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <p className="text-red-600 mb-4">Erro ao carregar rotas</p>
+          <Alert icon={<IconAlertCircle size="1rem" />} color="red" mb="md">
+            <Text size="sm">Erro ao carregar rotas</Text>
+          </Alert>
           <Button onClick={() => window.location.reload()}>
             Tentar Novamente
           </Button>
@@ -317,17 +238,84 @@ export default function RotasPage() {
   return (
     <Stack gap="lg">
       <Group justify="space-between">
-        <Title order={1}>Gerenciar Rotas</Title>
+        <div>
+          <Title order={1}>Gerenciar Rotas</Title>
+          <Text c="dimmed" mt="xs">
+            Planejamento e controle das rotas de transporte
+          </Text>
+        </div>
         <Button
           leftSection={<IconPlus size="1rem" />}
           onClick={handleAddNew}
           disabled={isOperationLoading}
         >
-          Adicionar Rota
+          Nova Rota
         </Button>
       </Group>
 
-      {/* Filtros */}
+      <Grid>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Card withBorder padding="md">
+            <Group justify="space-between">
+              <div>
+                <Text size="sm" c="dimmed">
+                  Total de Rotas
+                </Text>
+                <Text size="xl" fw={700}>
+                  {totalRoutes}
+                </Text>
+              </div>
+              <IconRoute size="2rem" color="blue" />
+            </Group>
+          </Card>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Card withBorder padding="md">
+            <Group justify="space-between">
+              <div>
+                <Text size="sm" c="dimmed">
+                  Planejadas
+                </Text>
+                <Text size="xl" fw={700} c="orange">
+                  {plannedRoutes}
+                </Text>
+              </div>
+              <IconClock size="2rem" color="orange" />
+            </Group>
+          </Card>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Card withBorder padding="md">
+            <Group justify="space-between">
+              <div>
+                <Text size="sm" c="dimmed">
+                  Em Andamento
+                </Text>
+                <Text size="xl" fw={700} c="blue">
+                  {inProgressRoutes}
+                </Text>
+              </div>
+              <IconCar size="2rem" color="blue" />
+            </Group>
+          </Card>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Card withBorder padding="md">
+            <Group justify="space-between">
+              <div>
+                <Text size="sm" c="dimmed">
+                  Concluídas
+                </Text>
+                <Text size="xl" fw={700} c="green">
+                  {completedRoutes}
+                </Text>
+              </div>
+              <IconCheck size="2rem" color="green" />
+            </Group>
+          </Card>
+        </Grid.Col>
+      </Grid>
+
       <Card withBorder padding="md">
         <Grid>
           <Grid.Col span={{ base: 12, md: 6 }}>
@@ -338,9 +326,9 @@ export default function RotasPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 3 }}>
+          <Grid.Col span={{ base: 12, md: 4 }}>
             <Select
-              placeholder="Status"
+              placeholder="Filtrar por status"
               data={[
                 { value: "Planejada", label: "Planejada" },
                 { value: "EmAndamento", label: "Em Andamento" },
@@ -352,45 +340,40 @@ export default function RotasPage() {
               clearable
             />
           </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 3 }}>
+          <Grid.Col span={{ base: 12, md: 2 }}>
             <Text size="sm" c="dimmed">
-              {filteredRoutes.length} rota(s) encontrada(s)
+              {filteredRoutes.length} registro(s)
             </Text>
           </Grid.Col>
         </Grid>
       </Card>
 
-      {/* Tabela de rotas */}
       <Card withBorder padding="md">
-        {filteredRoutes.length === 0 ? (
-          <Alert color="gray" mt="md">
-            {searchTerm || statusFilter
-              ? "Nenhuma rota encontrada"
-              : "Nenhuma rota cadastrada"}
-          </Alert>
-        ) : (
-          <>
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Rota</Table.Th>
-                  <Table.Th>Data/Hora</Table.Th>
-                  <Table.Th>Motorista/Veículo</Table.Th>
-                  <Table.Th>Ocupação</Table.Th>
-                  <Table.Th>Status</Table.Th>
-                  <Table.Th>Ações</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {paginatedRoutes.map((route: Route) => (
+        <div className="overflow-x-auto">
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Rota</Table.Th>
+                <Table.Th>Data/Hora</Table.Th>
+                <Table.Th>Motorista</Table.Th>
+                <Table.Th>Status</Table.Th>
+                <Table.Th>Ações</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {paginatedRoutes.length > 0 ? (
+                paginatedRoutes.map((route: Route) => (
                   <Table.Tr key={route.id}>
                     <Table.Td>
                       <div>
-                        <Text fw={500} size="sm">
+                        <Text fw={500}>
                           Rota {route.destination || route.tipo_rota || "Ida"}
                         </Text>
+                        <Text size="xs" c="dimmed">
+                          ID: {route.id || "N/A"}
+                        </Text>
                         <Group gap="xs" mt="xs">
-                          <IconMapPin size="0.8rem" color="gray" />
+                          <IconMapPin size="0.8rem" />
                           <Text size="xs" c="dimmed">
                             {route.destination === "Ida"
                               ? "Campus → Cidade"
@@ -401,11 +384,6 @@ export default function RotasPage() {
                                   : "Trajeto"}
                           </Text>
                         </Group>
-                        {route.observacoes && (
-                          <Text size="xs" c="blue" mt="xs">
-                            {route.observacoes}
-                          </Text>
-                        )}
                       </div>
                     </Table.Td>
                     <Table.Td>
@@ -422,75 +400,24 @@ export default function RotasPage() {
                           })()}
                         </Text>
                         <Group gap="xs">
-                          <IconClock size="0.8rem" color="blue" />
-                          <Text size="sm" c="blue">
+                          <IconClock size="0.8rem" />
+                          <Text size="sm">
                             {route.departureTime ||
                               route.horario_saida ||
                               "08:00"}
                           </Text>
-                          {route.horario_chegada && (
-                            <>
-                              <Text size="xs" c="dimmed">
-                                →
-                              </Text>
-                              <Text size="sm" c="green">
-                                {route.horario_chegada}
-                              </Text>
-                            </>
-                          )}
                         </Group>
                       </Stack>
                     </Table.Td>
                     <Table.Td>
-                      <div>
-                        <Text size="sm" fw={500}>
-                          {route.driverName ||
-                            driversArray.find(
-                              (d) =>
-                                d.id ===
-                                (route.driverId || route.fk_id_motorista),
-                            )?.name ||
-                            "Motorista não atribuído"}
-                        </Text>
-                        <Group gap="xs" mt="xs">
-                          <IconCar size="0.8rem" color="orange" />
-                          <Text size="xs" c="dimmed">
-                            {route.vehicle ||
-                              busesArray.find(
-                                (b) => b.id === route.fk_id_onibus,
-                              )?.modelo ||
-                              "Veículo não atribuído"}
-                          </Text>
-                        </Group>
-                        {route.km_percorrido && (
-                          <Text size="xs" c="dimmed" mt="xs">
-                            {route.km_percorrido} km
-                          </Text>
-                        )}
-                      </div>
-                    </Table.Td>
-                    <Table.Td>
-                      <Group gap="xs">
-                        <IconUsers size="0.8rem" color="green" />
-                        <Text size="sm">
-                          {route.enrolled || 0}/
-                          {route.capacity ||
-                            busesArray.find((b) => b.id === route.fk_id_onibus)
-                              ?.capacidade ||
-                            40}
-                        </Text>
-                      </Group>
-                      <Text size="xs" c="dimmed">
-                        {(() => {
-                          const capacity =
-                            route.capacity ||
-                            busesArray.find((b) => b.id === route.fk_id_onibus)
-                              ?.capacidade ||
-                            40;
-                          const enrolled = route.enrolled || 0;
-                          return Math.round((enrolled / capacity) * 100);
-                        })()}
-                        % ocupado
+                      <Text size="sm" fw={500}>
+                        {route.driverName ||
+                          driversArray.find(
+                            (d) =>
+                              d.id ===
+                              (route.driverId || route.fk_id_motorista),
+                          )?.name ||
+                          "Motorista não atribuído"}
                       </Text>
                     </Table.Td>
                     <Table.Td>
@@ -518,11 +445,10 @@ export default function RotasPage() {
                           >
                             Editar
                           </Menu.Item>
-                          <Menu.Divider />
                           <Menu.Item
                             color="red"
                             leftSection={<IconTrash size="0.9rem" />}
-                            onClick={() => handleDeleteClick(route)}
+                            onClick={() => handleDelete(route.id!)}
                           >
                             Cancelar
                           </Menu.Item>
@@ -530,205 +456,119 @@ export default function RotasPage() {
                       </Menu>
                     </Table.Td>
                   </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
+                ))
+              ) : (
+                <Table.Tr>
+                  <Table.Td colSpan={5} style={{ textAlign: "center" }}>
+                    <Text c="dimmed">
+                      {searchTerm || statusFilter
+                        ? "Nenhuma rota encontrada"
+                        : "Nenhuma rota cadastrada"}
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+            </Table.Tbody>
+          </Table>
+        </div>
 
-            {totalPages > 1 && (
-              <Group justify="center" mt="md">
-                <Pagination
-                  value={currentPage}
-                  onChange={setCurrentPage}
-                  total={totalPages}
-                />
-              </Group>
-            )}
-          </>
+        {totalPages > 1 && (
+          <Group justify="center" mt="md">
+            <Pagination
+              value={currentPage}
+              onChange={setCurrentPage}
+              total={totalPages}
+            />
+          </Group>
         )}
       </Card>
 
-      {/* Modal de adicionar/editar rota */}
       <Modal
         opened={opened}
         onClose={close}
-        title={editingRoute ? "Editar Rota" : "Adicionar Rota"}
+        title={editingRoute ? "Editar Rota" : "Nova Rota"}
         size="lg"
       >
-        <form onSubmit={handleSave}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.currentTarget);
+            handleSave(formData);
+          }}
+        >
           <Stack gap="md">
             <Grid>
               <Grid.Col span={12}>
                 <Select
                   label="Tipo de Rota"
                   placeholder="Selecione o tipo"
-                  required
+                  name="destination"
                   data={[
                     { value: "Ida", label: "Ida" },
                     { value: "Volta", label: "Volta" },
                     { value: "Circular", label: "Circular" },
                   ]}
-                  value={formData.destination}
-                  onChange={(value) =>
-                    setFormData({ ...formData, destination: value || "" })
-                  }
-                />
-              </Grid.Col>
-              <Grid.Col span={12}>
-                <Select
-                  label="Instituição"
-                  placeholder="Selecione uma instituição"
                   required
-                  data={institutionsSelectData}
-                  value={formData.origin}
-                  onChange={(value) =>
-                    setFormData({ ...formData, origin: value || "" })
-                  }
-                  searchable
-                  disabled={institutionsLoading}
+                  defaultValue={editingRoute?.destination}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
                 <TextInput
                   label="Data"
                   placeholder="YYYY-MM-DD"
+                  name="date"
                   type="date"
-                  value={formData.date}
-                  onChange={(e) =>
-                    setFormData({ ...formData, date: e.target.value })
-                  }
+                  defaultValue={editingRoute?.date}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
                 <TextInput
                   label="Horário de Saída"
                   placeholder="HH:MM"
+                  name="departureTime"
                   type="time"
                   required
-                  value={formData.departureTime}
-                  onChange={(e) =>
-                    setFormData({ ...formData, departureTime: e.target.value })
-                  }
-                />
-              </Grid.Col>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <TextInput
-                  label="Horário de Chegada"
-                  placeholder="HH:MM"
-                  type="time"
-                  value={formData.time}
-                  onChange={(e) =>
-                    setFormData({ ...formData, time: e.target.value })
-                  }
+                  defaultValue={editingRoute?.departureTime}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
                 <Select
                   label="Motorista"
                   placeholder="Selecione um motorista"
-                  required
+                  name="driverId"
                   data={driversSelectData}
-                  value={formData.driver}
-                  onChange={(value) =>
-                    setFormData({ ...formData, driver: value || "" })
-                  }
-                  searchable
-                  disabled={driversLoading}
-                />
-              </Grid.Col>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <Select
-                  label="Ônibus"
-                  placeholder="Selecione um ônibus"
                   required
-                  data={busesSelectData}
-                  value={formData.vehicle}
-                  onChange={(value) =>
-                    setFormData({ ...formData, vehicle: value || "" })
-                  }
+                  defaultValue={editingRoute?.driverId?.toString()}
                   searchable
-                  disabled={busesLoading}
-                />
-              </Grid.Col>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <TextInput
-                  label="KM Percorrido"
-                  placeholder="0"
-                  type="number"
-                  step="0.1"
-                  value={formData.price}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      price: parseFloat(e.target.value) || 0,
-                    })
-                  }
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
                 <Select
                   label="Status"
                   placeholder="Selecione o status"
+                  name="status"
                   data={[
-                    { value: "scheduled", label: "Agendada" },
-                    { value: "in_progress", label: "Em andamento" },
-                    { value: "completed", label: "Concluída" },
-                    { value: "cancelled", label: "Cancelada" },
+                    { value: "Planejada", label: "Planejada" },
+                    { value: "EmAndamento", label: "Em Andamento" },
+                    { value: "Concluida", label: "Concluída" },
+                    { value: "Cancelada", label: "Cancelada" },
                   ]}
                   required
-                  value={formData.status}
-                  onChange={(value) =>
-                    setFormData({ ...formData, status: value || "Planejada" })
-                  }
+                  defaultValue={editingRoute?.status}
                 />
               </Grid.Col>
             </Grid>
 
             <Group justify="flex-end" mt="md">
-              <Button
-                variant="light"
-                onClick={close}
-                disabled={isOperationLoading}
-              >
+              <Button variant="light" onClick={close} type="button">
                 Cancelar
               </Button>
               <Button type="submit" loading={isOperationLoading}>
-                {editingRoute ? "Salvar" : "Adicionar"}
+                {editingRoute ? "Salvar" : "Criar"}
               </Button>
             </Group>
           </Stack>
         </form>
-      </Modal>
-
-      {/* Modal de confirmação de exclusão */}
-      <Modal
-        opened={deleteModalOpened}
-        onClose={closeDeleteModal}
-        title="Confirmar cancelamento"
-      >
-        <Stack gap="md">
-          <Alert icon={<IconAlertCircle size="1rem" />} color="red">
-            <Text size="sm">
-              Tem certeza que deseja cancelar a rota{" "}
-              <strong>
-                {routeToDelete?.destination || routeToDelete?.name}
-              </strong>
-              do dia {routeToDelete?.date}? Esta ação não pode ser desfeita.
-            </Text>
-          </Alert>
-
-          <Group justify="flex-end">
-            <Button variant="light" onClick={closeDeleteModal}>
-              Cancelar
-            </Button>
-            <Button
-              color="red"
-              onClick={handleDeleteConfirm}
-              loading={deleteRouteMutation.isPending}
-            >
-              Cancelar Rota
-            </Button>
-          </Group>
-        </Stack>
       </Modal>
     </Stack>
   );

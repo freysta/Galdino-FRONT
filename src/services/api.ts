@@ -67,10 +67,11 @@ export interface Payment {
   month: string;
   monthLabel?: string;
   year?: number;
-  status: "Pago" | "Pendente" | "Atrasado" | string | number;
+  status: "Pago" | "Pendente" | "Atrasado" | "Não informado" | string | number;
   paymentMethod?: "Dinheiro" | "CartaoCredito" | "Pix" | "Transferencia";
   paymentDate?: string;
   dueDate?: string;
+  createdAt?: string;
 }
 
 export interface Route {
@@ -696,7 +697,7 @@ export type RouteStatus =
   | "EmAndamento"
   | "Concluida"
   | "Cancelada";
-export type PaymentStatus = "Pago" | "Pendente" | "Atrasado";
+export type PaymentStatus = "Pago" | "Pendente" | "Atrasado" | "Não informado";
 export type StudentShift = "Manha" | "Tarde" | "Noite" | "Integral";
 
 export default api;

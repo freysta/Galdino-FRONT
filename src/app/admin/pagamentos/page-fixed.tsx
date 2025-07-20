@@ -69,19 +69,8 @@ export default function PagamentosPage() {
     label: student.name || `Aluno #${student.id}`,
   }));
 
-  // Garantir que payments é um array e ordenar por data de criação (mais recentes primeiro)
-  const paymentsArray = Array.isArray(payments)
-    ? [...payments].sort((a, b) => {
-        // Ordenar por ID decrescente (assumindo que IDs maiores = mais recentes)
-        // ou por data de criação se disponível
-        if (a.createdAt && b.createdAt) {
-          return (
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-        }
-        return (b.id || 0) - (a.id || 0);
-      })
-    : [];
+  // Garantir que payments é um array
+  const paymentsArray = Array.isArray(payments) ? payments : [];
 
   // Função para buscar nome do aluno pelo ID
   const getStudentName = (studentId: number) => {
@@ -89,66 +78,57 @@ export default function PagamentosPage() {
     return student?.name || `Aluno #${studentId}`;
   };
 
-  // Mapeamento de status - corrigido para lidar com diferentes formatos da API
+  // Mapeamento de status por ID (se a API retornar IDs) ou por nome
   const getStatusInfo = (status: string | number) => {
-    // Converter para string e normalizar
-    const statusStr = String(status).toLowerCase().trim();
+    // Se for um número (ID), mapear para o nome correspondente
+    if (typeof status === "number") {
+      switch (status) {
+        case 1:
+          return {
+            name: "Pendente",
+            color: "yellow",
+            icon: <IconClock size="0.8rem" />,
+          };
+        case 2:
+          return {
+            name: "Pago",
+            color: "green",
+            icon: <IconCheck size="0.8rem" />,
+          };
+        case 3:
+          return {
+            name: "Atrasado",
+            color: "red",
+            icon: <IconX size="0.8rem" />,
+          };
+        default:
+          return { name: "Desconhecido", color: "gray", icon: null };
+      }
+    }
 
-    // Mapear diferentes variações de status
+    // Se for string, usar diretamente
+    const statusStr = String(status);
     switch (statusStr) {
-      case "pago":
-      case "paid":
-      case "2":
+      case "Pago":
         return {
           name: "Pago",
           color: "green",
           icon: <IconCheck size="0.8rem" />,
         };
-      case "pendente":
-      case "pending":
-      case "1":
+      case "Pendente":
         return {
           name: "Pendente",
           color: "yellow",
           icon: <IconClock size="0.8rem" />,
         };
-      case "atrasado":
-      case "overdue":
-      case "late":
-      case "3":
+      case "Atrasado":
         return {
           name: "Atrasado",
           color: "red",
           icon: <IconX size="0.8rem" />,
         };
-      case "cancelado":
-      case "cancelled":
-      case "4":
-        return {
-          name: "Cancelado",
-          color: "gray",
-          icon: <IconX size="0.8rem" />,
-        };
-      case "não informado":
-      case "nao informado":
-      case "not informed":
-      case "":
-      case "null":
-      case "undefined":
-      case "0":
-        return {
-          name: "Não informado",
-          color: "gray",
-          icon: <IconAlertCircle size="0.8rem" />,
-        };
       default:
-        // Log para debug - ver o que está vindo da API
-        console.log("Status não reconhecido:", status, typeof status);
-        return {
-          name: status ? String(status) : "Não informado",
-          color: "gray",
-          icon: <IconAlertCircle size="0.8rem" />,
-        };
+        return { name: statusStr || "Desconhecido", color: "gray", icon: null };
     }
   };
 
@@ -211,77 +191,26 @@ export default function PagamentosPage() {
 
   const handleSave = async (formData: FormData) => {
     try {
-      // Mapear paymentMethod para os tipos corretos da interface Payment
-      const mapPaymentMethod = (
-        method: string | null,
-      ): "Dinheiro" | "CartaoCredito" | "Pix" | "Transferencia" | undefined => {
-        if (!method) return undefined;
-
-        switch (method) {
-          case "PIX":
-          case "Pix":
-            return "Pix";
-          case "Cartão":
-          case "CartaoCredito":
-            return "CartaoCredito";
-          case "Dinheiro":
-            return "Dinheiro";
-          case "Transferência":
-          case "Transferencia":
-            return "Transferencia";
-          default:
-            return "Dinheiro"; // valor padrão
-        }
-      };
-
-      // Mapear status para os tipos corretos da interface Payment
-      const mapStatus = (
-        status: string | null,
-      ): "Pago" | "Pendente" | "Atrasado" => {
-        switch (status) {
-          case "Pago":
-            return "Pago";
-          case "Pendente":
-            return "Pendente";
-          case "Atrasado":
-            return "Atrasado";
-          default:
-            return "Pendente";
-        }
-      };
-
-      // Validação de data - garantir que não seja futura
-      const validateDate = (dateStr: string): string => {
-        const date = new Date(dateStr);
-        const today = new Date();
-        today.setHours(23, 59, 59, 999); // Final do dia atual
-
-        if (date > today) {
-          // Se a data for futura, usar a data atual
-          return new Date().toISOString();
-        }
-        return dateStr;
+      // Estrutura alinhada com o script de teste
+      const paymentData = {
+        studentId: parseInt(formData.get("studentId") as string),
+        amount: parseFloat(formData.get("amount") as string),
+        month: formData.get("month") as string,
+        status:
+          (formData.get("status") as "Pago" | "Pendente" | "Atrasado") ||
+          "Pendente",
+        paymentMethod:
+          (formData.get("paymentMethod") as
+            | "Dinheiro"
+            | "CartaoCredito"
+            | "Pix"
+            | "Transferencia") || "Dinheiro",
       };
 
       if (editingPayment?.id) {
-        // Para UPDATE, enviar apenas os campos que podem ser alterados
-        const updateData: Partial<Payment> = {
-          amount: parseFloat(formData.get("amount") as string),
-          status: mapStatus(formData.get("status") as string),
-          paymentMethod: mapPaymentMethod(
-            formData.get("paymentMethod") as string,
-          ),
-          // Adicionar paymentDate se o status for "Pago"
-          ...(formData.get("status") === "Pago" && {
-            paymentDate: validateDate(new Date().toISOString()),
-          }),
-        };
-
-        console.log("Dados de UPDATE:", updateData);
-
         await updateMutation.mutateAsync({
           id: editingPayment.id,
-          data: updateData,
+          data: paymentData,
         });
         notifications.show({
           title: "Sucesso",
@@ -289,20 +218,7 @@ export default function PagamentosPage() {
           color: "green",
         });
       } else {
-        // Para CREATE, enviar todos os campos obrigatórios
-        const createData: Omit<Payment, "id" | "createdAt"> = {
-          studentId: parseInt(formData.get("studentId") as string),
-          amount: parseFloat(formData.get("amount") as string),
-          month: formData.get("month") as string,
-          status: mapStatus(formData.get("status") as string),
-          paymentMethod: mapPaymentMethod(
-            formData.get("paymentMethod") as string,
-          ),
-        };
-
-        console.log("Dados de CREATE:", createData);
-
-        await createMutation.mutateAsync(createData);
+        await createMutation.mutateAsync(paymentData);
         notifications.show({
           title: "Sucesso",
           message: "Cobrança criada com sucesso!",
@@ -315,8 +231,7 @@ export default function PagamentosPage() {
       console.error("Erro ao salvar pagamento:", error);
       notifications.show({
         title: "Erro",
-        message:
-          "Erro ao salvar pagamento. Verifique os dados e tente novamente.",
+        message: "Erro ao salvar pagamento",
         color: "red",
       });
     }
@@ -335,19 +250,19 @@ export default function PagamentosPage() {
     startIndex + itemsPerPage,
   );
 
-  // Estatísticas
+  // Estatísticas - usando getStatusLabel para comparação correta
   const totalAmount = filteredPayments.reduce(
     (sum: number, p: Payment) => sum + (p.amount || 0),
     0,
   );
   const paidAmount = filteredPayments
-    .filter((p: Payment) => p.status === "Pago")
+    .filter((p: Payment) => getStatusLabel(p.status) === "Pago")
     .reduce((sum: number, p: Payment) => sum + (p.amount || 0), 0);
   const pendingAmount = filteredPayments
-    .filter((p: Payment) => p.status === "Pendente")
+    .filter((p: Payment) => getStatusLabel(p.status) === "Pendente")
     .reduce((sum: number, p: Payment) => sum + (p.amount || 0), 0);
   const overdueAmount = filteredPayments
-    .filter((p: Payment) => p.status === "Atrasado")
+    .filter((p: Payment) => getStatusLabel(p.status) === "Atrasado")
     .reduce((sum: number, p: Payment) => sum + (p.amount || 0), 0);
 
   if (isLoading) {
@@ -481,7 +396,6 @@ export default function PagamentosPage() {
                 { value: "Pago", label: "Pago" },
                 { value: "Pendente", label: "Pendente" },
                 { value: "Atrasado", label: "Atrasado" },
-                { value: "Não informado", label: "Não informado" },
               ]}
               value={statusFilter}
               onChange={setStatusFilter}
@@ -498,12 +412,6 @@ export default function PagamentosPage() {
                 { value: "04/2024", label: "Abril 2024" },
                 { value: "05/2024", label: "Maio 2024" },
                 { value: "06/2024", label: "Junho 2024" },
-                { value: "07/2024", label: "Julho 2024" },
-                { value: "08/2024", label: "Agosto 2024" },
-                { value: "09/2024", label: "Setembro 2024" },
-                { value: "10/2024", label: "Outubro 2024" },
-                { value: "11/2024", label: "Novembro 2024" },
-                { value: "12/2024", label: "Dezembro 2024" },
               ]}
               value={monthFilter}
               onChange={setMonthFilter}
@@ -612,47 +520,15 @@ export default function PagamentosPage() {
                               : 400
                           }
                         >
-                          {/* Mapear métodos de pagamento conforme enum do BD */}
-                          {(() => {
-                            const method = payment.paymentMethod;
-                            if (!method) return "Não informado";
-
-                            const methodStr = String(method).trim();
-                            switch (methodStr) {
-                              case "Pix":
-                              case "PIX":
-                              case "pix":
-                                return "PIX";
-                              case "CartaoCredito":
-                              case "Cartão":
-                              case "cartão":
-                                return "Cartão";
-                              case "Dinheiro":
-                              case "dinheiro":
-                                return "Dinheiro";
-                              case "Transferencia":
-                              case "Transferência":
-                              case "transferência":
-                                return "Transferência";
-                              default:
-                                return String(method);
-                            }
-                          })()}
+                          {payment.paymentMethod || "Não informado"}
                         </Text>
                         {payment.paymentDate && (
                           <Text size="xs" c="dimmed">
-                            Pago em:{" "}
                             {new Date(payment.paymentDate).toLocaleDateString(
                               "pt-BR",
                             )}
                           </Text>
                         )}
-                        {getStatusLabel(payment.status) === "Pago" &&
-                          !payment.paymentDate && (
-                            <Text size="xs" c="dimmed">
-                              Data não informada
-                            </Text>
-                          )}
                       </div>
                     </Table.Td>
                     <Table.Td>
@@ -738,7 +614,15 @@ export default function PagamentosPage() {
                   name="studentId"
                   data={studentsSelectData}
                   required
-                  defaultValue={editingPayment?.studentId?.toString()}
+                  value={editingPayment?.studentId?.toString() || ""}
+                  onChange={(value) => {
+                    if (editingPayment) {
+                      setEditingPayment({
+                        ...editingPayment,
+                        studentId: value ? parseInt(value) : 0,
+                      });
+                    }
+                  }}
                   searchable
                   disabled={studentsLoading}
                 />
@@ -755,15 +639,17 @@ export default function PagamentosPage() {
                     { value: "04/2024", label: "Abril 2024" },
                     { value: "05/2024", label: "Maio 2024" },
                     { value: "06/2024", label: "Junho 2024" },
-                    { value: "07/2024", label: "Julho 2024" },
-                    { value: "08/2024", label: "Agosto 2024" },
-                    { value: "09/2024", label: "Setembro 2024" },
-                    { value: "10/2024", label: "Outubro 2024" },
-                    { value: "11/2024", label: "Novembro 2024" },
-                    { value: "12/2024", label: "Dezembro 2024" },
                   ]}
                   required
-                  defaultValue={editingPayment?.month}
+                  value={editingPayment?.month || ""}
+                  onChange={(value) => {
+                    if (editingPayment) {
+                      setEditingPayment({
+                        ...editingPayment,
+                        month: value || "",
+                      });
+                    }
+                  }}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
@@ -774,8 +660,15 @@ export default function PagamentosPage() {
                   decimalScale={2}
                   fixedDecimalScale
                   required
-                  min={0}
-                  defaultValue={editingPayment?.amount}
+                  value={editingPayment?.amount || 0}
+                  onChange={(value) => {
+                    if (editingPayment) {
+                      setEditingPayment({
+                        ...editingPayment,
+                        amount: typeof value === "number" ? value : 0,
+                      });
+                    }
+                  }}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
@@ -789,7 +682,21 @@ export default function PagamentosPage() {
                     { value: "Atrasado", label: "Atrasado" },
                   ]}
                   required
-                  defaultValue={editingPayment?.status?.toString()}
+                  value={
+                    editingPayment?.status
+                      ? getStatusLabel(editingPayment.status)
+                      : ""
+                  }
+                  onChange={(value) => {
+                    if (editingPayment) {
+                      setEditingPayment({
+                        ...editingPayment,
+                        status:
+                          (value as "Pago" | "Pendente" | "Atrasado") ||
+                          "Pendente",
+                      });
+                    }
+                  }}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
@@ -798,12 +705,24 @@ export default function PagamentosPage() {
                   placeholder="Selecione a forma"
                   name="paymentMethod"
                   data={[
-                    { value: "Pix", label: "PIX" },
-                    { value: "CartaoCredito", label: "Cartão" },
                     { value: "Dinheiro", label: "Dinheiro" },
+                    { value: "CartaoCredito", label: "Cartão de Crédito" },
+                    { value: "Pix", label: "PIX" },
                     { value: "Transferencia", label: "Transferência" },
                   ]}
-                  defaultValue={editingPayment?.paymentMethod}
+                  value={editingPayment?.paymentMethod || ""}
+                  onChange={(value) => {
+                    if (editingPayment) {
+                      setEditingPayment({
+                        ...editingPayment,
+                        paymentMethod: value as
+                          | "Dinheiro"
+                          | "CartaoCredito"
+                          | "Pix"
+                          | "Transferencia",
+                      });
+                    }
+                  }}
                 />
               </Grid.Col>
             </Grid>

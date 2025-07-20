@@ -2,24 +2,27 @@
 
 import { useState } from "react";
 import {
-  Container,
   Title,
-  Paper,
-  Table,
   Button,
-  Group,
   TextInput,
-  Modal,
+  Group,
   Stack,
+  Card,
   Badge,
   ActionIcon,
-  Menu,
-  Text,
-  Alert,
+  Modal,
   Select,
-  NumberInput,
   Grid,
+  Text,
+  Table,
+  Pagination,
+  Menu,
+  NumberInput,
+  Loader,
+  Alert,
 } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
+import { notifications } from "@mantine/notifications";
 import {
   IconPlus,
   IconSearch,
@@ -27,140 +30,51 @@ import {
   IconTrash,
   IconDots,
   IconBus,
+  IconUsers,
+  IconCalendar,
+  IconAlertCircle,
 } from "@tabler/icons-react";
-import { notifications } from "@mantine/notifications";
+
 import {
   useBuses,
   useCreateBus,
   useUpdateBus,
   useDeleteBus,
+  type Bus,
+  type BusStatus,
 } from "@/hooks/useApi";
-import { Bus } from "@/services/api";
 
-interface BusForm {
-  placa: string;
-  modelo: string;
-  ano: number;
-  capacidade: number;
-  status: "Ativo" | "Manutenção" | "Inativo";
-}
-
-export default function BusesPage() {
-  const [opened, setOpened] = useState(false);
-  const [editingBus, setEditingBus] = useState<Bus | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+export default function OnibusPage() {
+  const [opened, { open, close }] = useDisclosure(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [formData, setFormData] = useState<BusForm>({
-    placa: "",
-    modelo: "",
-    ano: new Date().getFullYear(),
-    capacidade: 40,
-    status: "Ativo",
-  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [editingBus, setEditingBus] = useState<Bus | null>(null);
 
-  // Usar React Query hooks
   const { data: buses = [], isLoading, error } = useBuses();
-  const createBusMutation = useCreateBus();
-  const updateBusMutation = useUpdateBus();
-  const deleteBusMutation = useDeleteBus();
+  const createMutation = useCreateBus();
+  const updateMutation = useUpdateBus();
+  const deleteMutation = useDeleteBus();
 
-  // Garantir que buses é um array
   const busesArray = Array.isArray(buses) ? buses : [];
 
-  const validateForm = () => {
-    if (!formData.placa) {
-      notifications.show({
-        title: "Erro",
-        message: "Placa é obrigatória",
-        color: "red",
-      });
-      return false;
-    }
-    if (!formData.modelo) {
-      notifications.show({
-        title: "Erro",
-        message: "Modelo é obrigatório",
-        color: "red",
-      });
-      return false;
-    }
-    if (
-      !formData.ano ||
-      formData.ano < 1990 ||
-      formData.ano > new Date().getFullYear() + 1
-    ) {
-      notifications.show({
-        title: "Erro",
-        message: "Ano inválido",
-        color: "red",
-      });
-      return false;
-    }
-    if (
-      !formData.capacidade ||
-      formData.capacidade < 1 ||
-      formData.capacidade > 100
-    ) {
-      notifications.show({
-        title: "Erro",
-        message: "Capacidade deve ser entre 1 e 100",
-        color: "red",
-      });
-      return false;
-    }
-    return true;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) return;
-
-    try {
-      if (editingBus) {
-        await updateBusMutation.mutateAsync({
-          id: editingBus.id!,
-          data: formData,
-        });
-        notifications.show({
-          title: "Sucesso",
-          message: "Ônibus atualizado com sucesso!",
-          color: "green",
-        });
-      } else {
-        await createBusMutation.mutateAsync(formData as Bus);
-        notifications.show({
-          title: "Sucesso",
-          message: "Ônibus criado com sucesso!",
-          color: "green",
-        });
-      }
-      handleCloseModal();
-    } catch {
-      notifications.show({
-        title: "Erro",
-        message: "Erro ao salvar ônibus",
-        color: "red",
-      });
-    }
-  };
+  const filteredBuses = busesArray.filter((bus: Bus) => {
+    const matchesSearch =
+      bus.placa?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      bus.modelo?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = !statusFilter || bus.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const handleEdit = (bus: Bus) => {
     setEditingBus(bus);
-    setFormData({
-      placa: bus.placa || "",
-      modelo: bus.modelo || "",
-      ano: bus.ano || new Date().getFullYear(),
-      capacidade: bus.capacidade || 40,
-      status: bus.status || "Ativo",
-    });
-    setOpened(true);
+    open();
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm("Tem certeza que deseja excluir este ônibus?")) {
+    if (confirm("Tem certeza que deseja excluir este ônibus?")) {
       try {
-        await deleteBusMutation.mutateAsync(id);
+        await deleteMutation.mutateAsync(id);
         notifications.show({
           title: "Sucesso",
           message: "Ônibus excluído com sucesso!",
@@ -176,32 +90,51 @@ export default function BusesPage() {
     }
   };
 
-  const handleCloseModal = () => {
-    setOpened(false);
-    setEditingBus(null);
-    setFormData({
-      placa: "",
-      modelo: "",
-      ano: new Date().getFullYear(),
-      capacidade: 40,
-      status: "Ativo",
-    });
+  const handleSave = async (formData: FormData) => {
+    try {
+      const busData = {
+        placa: formData.get("placa") as string,
+        modelo: formData.get("modelo") as string,
+        ano: parseInt(formData.get("ano") as string),
+        capacidade: parseInt(formData.get("capacidade") as string),
+        status: formData.get("status") as BusStatus,
+      };
+
+      if (editingBus?.id) {
+        await updateMutation.mutateAsync({
+          id: editingBus.id,
+          data: busData,
+        });
+        notifications.show({
+          title: "Sucesso",
+          message: "Ônibus atualizado com sucesso!",
+          color: "green",
+        });
+      } else {
+        await createMutation.mutateAsync(busData);
+        notifications.show({
+          title: "Sucesso",
+          message: "Ônibus criado com sucesso!",
+          color: "green",
+        });
+      }
+      close();
+      setEditingBus(null);
+    } catch {
+      notifications.show({
+        title: "Erro",
+        message: "Erro ao salvar ônibus",
+        color: "red",
+      });
+    }
   };
 
-  const isOperationLoading =
-    createBusMutation.isPending ||
-    updateBusMutation.isPending ||
-    deleteBusMutation.isPending;
+  const handleAddNew = () => {
+    setEditingBus(null);
+    open();
+  };
 
-  const filteredBuses = busesArray.filter((bus: Bus) => {
-    const matchesSearch =
-      bus.placa?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      bus.modelo?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = !statusFilter || bus.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
-  const getStatusBadgeColor = (status: string) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case "Ativo":
         return "green";
@@ -214,10 +147,37 @@ export default function BusesPage() {
     }
   };
 
+  const isOperationLoading =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending;
+
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(filteredBuses.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedBuses = filteredBuses.slice(
+    startIndex,
+    startIndex + itemsPerPage,
+  );
+
+  const totalBuses = busesArray.length;
+  const activeBuses = busesArray.filter(
+    (b: Bus) => b.status === "Ativo",
+  ).length;
+  const maintenanceBuses = busesArray.filter(
+    (b: Bus) => b.status === "Manutenção",
+  ).length;
+  const inactiveBuses = busesArray.filter(
+    (b: Bus) => b.status === "Inativo",
+  ).length;
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <Loader size="lg" />
+          <Text mt="md">Carregando ônibus...</Text>
+        </div>
       </div>
     );
   }
@@ -226,7 +186,9 @@ export default function BusesPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <p className="text-red-600 mb-4">Erro ao carregar ônibus</p>
+          <Alert icon={<IconAlertCircle size="1rem" />} color="red" mb="md">
+            <Text size="sm">Erro ao carregar ônibus</Text>
+          </Alert>
           <Button onClick={() => window.location.reload()}>
             Tentar Novamente
           </Button>
@@ -236,21 +198,97 @@ export default function BusesPage() {
   }
 
   return (
-    <Container size="xl">
-      <Title order={2} mb="xl">
-        Gerenciar Ônibus
-      </Title>
+    <Stack gap="lg">
+      <Group justify="space-between">
+        <div>
+          <Title order={1}>Gerenciar Ônibus</Title>
+          <Text c="dimmed" mt="xs">
+            Controle da frota de veículos
+          </Text>
+        </div>
+        <Button
+          leftSection={<IconPlus size="1rem" />}
+          onClick={handleAddNew}
+          disabled={isOperationLoading}
+        >
+          Novo Ônibus
+        </Button>
+      </Group>
 
-      <Paper shadow="sm" p="md" withBorder>
-        <Group justify="space-between" mb="md">
-          <Group>
+      <Grid>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Card withBorder padding="md">
+            <Group justify="space-between">
+              <div>
+                <Text size="sm" c="dimmed">
+                  Total de Ônibus
+                </Text>
+                <Text size="xl" fw={700}>
+                  {totalBuses}
+                </Text>
+              </div>
+              <IconBus size="2rem" color="blue" />
+            </Group>
+          </Card>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Card withBorder padding="md">
+            <Group justify="space-between">
+              <div>
+                <Text size="sm" c="dimmed">
+                  Ativos
+                </Text>
+                <Text size="xl" fw={700} c="green">
+                  {activeBuses}
+                </Text>
+              </div>
+              <IconUsers size="2rem" color="green" />
+            </Group>
+          </Card>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Card withBorder padding="md">
+            <Group justify="space-between">
+              <div>
+                <Text size="sm" c="dimmed">
+                  Manutenção
+                </Text>
+                <Text size="xl" fw={700} c="orange">
+                  {maintenanceBuses}
+                </Text>
+              </div>
+              <IconCalendar size="2rem" color="orange" />
+            </Group>
+          </Card>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Card withBorder padding="md">
+            <Group justify="space-between">
+              <div>
+                <Text size="sm" c="dimmed">
+                  Inativos
+                </Text>
+                <Text size="xl" fw={700} c="red">
+                  {inactiveBuses}
+                </Text>
+              </div>
+              <IconBus size="2rem" color="red" />
+            </Group>
+          </Card>
+        </Grid.Col>
+      </Grid>
+
+      <Card withBorder padding="md">
+        <Grid>
+          <Grid.Col span={{ base: 12, md: 6 }}>
             <TextInput
               placeholder="Buscar por placa ou modelo..."
-              leftSection={<IconSearch size={16} />}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.currentTarget.value)}
-              style={{ width: 300 }}
+              leftSection={<IconSearch size="1rem" />}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 4 }}>
             <Select
               placeholder="Filtrar por status"
               data={[
@@ -261,79 +299,79 @@ export default function BusesPage() {
               value={statusFilter}
               onChange={setStatusFilter}
               clearable
-              style={{ width: 200 }}
             />
-          </Group>
-          <Button
-            leftSection={<IconPlus size={16} />}
-            onClick={() => setOpened(true)}
-            disabled={isOperationLoading}
-          >
-            Novo Ônibus
-          </Button>
-        </Group>
+          </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 2 }}>
+            <Text size="sm" c="dimmed">
+              {filteredBuses.length} registro(s)
+            </Text>
+          </Grid.Col>
+        </Grid>
+      </Card>
 
-        <div style={{ position: "relative", minHeight: 400 }}>
-          {filteredBuses.length === 0 && (
-            <Alert color="gray" mt="md">
-              {searchQuery || statusFilter
-                ? "Nenhum ônibus encontrado"
-                : "Nenhum ônibus cadastrado"}
-            </Alert>
-          )}
-
-          {filteredBuses.length > 0 && (
-            <Table striped highlightOnHover>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Veículo</Table.Th>
-                  <Table.Th>Capacidade</Table.Th>
-                  <Table.Th>Status</Table.Th>
-                  <Table.Th style={{ width: 80 }}>Ações</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {filteredBuses.map((bus: Bus) => (
+      <Card withBorder padding="md">
+        <div className="overflow-x-auto">
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Veículo</Table.Th>
+                <Table.Th>Especificações</Table.Th>
+                <Table.Th>Status</Table.Th>
+                <Table.Th>Ações</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {paginatedBuses.length > 0 ? (
+                paginatedBuses.map((bus: Bus) => (
                   <Table.Tr key={bus.id}>
                     <Table.Td>
-                      <Group gap="xs">
-                        <IconBus size={20} />
-                        <div>
-                          <Text fw={500}>
-                            {bus.placa || "Placa não informada"}
-                          </Text>
-                          <Text size="sm" c="dimmed">
-                            {bus.modelo || "Modelo não informado"} -{" "}
-                            {bus.ano || "N/A"}
-                          </Text>
-                        </div>
-                      </Group>
+                      <div>
+                        <Text fw={500}>
+                          {bus.placa || "Placa não informada"}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          ID: {bus.id || "N/A"}
+                        </Text>
+                      </div>
                     </Table.Td>
                     <Table.Td>
-                      <Text>{bus.capacidade || 0} lugares</Text>
+                      <Stack gap="xs">
+                        <Text size="sm">
+                          {bus.modelo || "Modelo não informado"}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          Ano: {bus.ano || "N/A"}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          Capacidade: {bus.capacidade || 0} lugares
+                        </Text>
+                      </Stack>
                     </Table.Td>
                     <Table.Td>
-                      <Badge color={getStatusBadgeColor(bus.status || "")}>
+                      <Badge
+                        color={getStatusColor(bus.status || "")}
+                        variant="light"
+                      >
                         {bus.status || "Indefinido"}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
                       <Menu shadow="md" width={200}>
                         <Menu.Target>
-                          <ActionIcon variant="subtle">
-                            <IconDots size={16} />
+                          <ActionIcon variant="subtle" color="gray">
+                            <IconDots size="1rem" />
                           </ActionIcon>
                         </Menu.Target>
                         <Menu.Dropdown>
                           <Menu.Item
-                            leftSection={<IconEdit size={14} />}
+                            leftSection={<IconEdit size="0.9rem" />}
                             onClick={() => handleEdit(bus)}
                           >
                             Editar
                           </Menu.Item>
                           <Menu.Item
                             color="red"
-                            leftSection={<IconTrash size={14} />}
+                            leftSection={<IconTrash size="0.9rem" />}
                             onClick={() => handleDelete(bus.id!)}
                           >
                             Excluir
@@ -342,108 +380,115 @@ export default function BusesPage() {
                       </Menu>
                     </Table.Td>
                   </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          )}
+                ))
+              ) : (
+                <Table.Tr>
+                  <Table.Td colSpan={4} style={{ textAlign: "center" }}>
+                    <Text c="dimmed">
+                      {searchTerm || statusFilter
+                        ? "Nenhum ônibus encontrado"
+                        : "Nenhum ônibus cadastrado"}
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+            </Table.Tbody>
+          </Table>
         </div>
-      </Paper>
+
+        {totalPages > 1 && (
+          <Group justify="center" mt="md">
+            <Pagination
+              value={currentPage}
+              onChange={setCurrentPage}
+              total={totalPages}
+            />
+          </Group>
+        )}
+      </Card>
 
       <Modal
         opened={opened}
-        onClose={handleCloseModal}
+        onClose={close}
         title={editingBus ? "Editar Ônibus" : "Novo Ônibus"}
-        size="md"
+        size="lg"
       >
-        <form onSubmit={handleSubmit}>
-          <Stack>
-            <TextInput
-              label="Placa"
-              placeholder="ABC-1234"
-              required
-              value={formData.placa}
-              onChange={(e) =>
-                setFormData({ ...formData, placa: e.target.value })
-              }
-            />
-
-            <TextInput
-              label="Modelo"
-              placeholder="Ex: Mercedes-Benz OF 1721"
-              required
-              value={formData.modelo}
-              onChange={(e) =>
-                setFormData({ ...formData, modelo: e.target.value })
-              }
-            />
-
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const formData = new FormData(e.currentTarget);
+            handleSave(formData);
+          }}
+        >
+          <Stack gap="md">
             <Grid>
-              <Grid.Col span={6}>
-                <NumberInput
-                  label="Ano"
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="Placa"
+                  placeholder="ABC-1234"
+                  name="placa"
                   required
-                  min={1990}
-                  max={new Date().getFullYear() + 1}
-                  value={formData.ano}
-                  onChange={(value) =>
-                    setFormData({
-                      ...formData,
-                      ano: Number(value) || new Date().getFullYear(),
-                    })
-                  }
+                  defaultValue={editingBus?.placa}
                 />
               </Grid.Col>
-              <Grid.Col span={6}>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <Select
+                  label="Status"
+                  placeholder="Selecione o status"
+                  name="status"
+                  data={[
+                    { value: "Ativo", label: "Ativo" },
+                    { value: "Manutenção", label: "Manutenção" },
+                    { value: "Inativo", label: "Inativo" },
+                  ]}
+                  required
+                  defaultValue={editingBus?.status}
+                />
+              </Grid.Col>
+              <Grid.Col span={12}>
+                <TextInput
+                  label="Modelo"
+                  placeholder="Ex: Mercedes-Benz OF 1721"
+                  name="modelo"
+                  required
+                  defaultValue={editingBus?.modelo}
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <NumberInput
+                  label="Ano"
+                  placeholder="2020"
+                  name="ano"
+                  min={1990}
+                  max={new Date().getFullYear() + 1}
+                  required
+                  defaultValue={editingBus?.ano}
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
                 <NumberInput
                   label="Capacidade"
-                  required
+                  placeholder="40"
+                  name="capacidade"
                   min={1}
                   max={100}
-                  value={formData.capacidade}
-                  onChange={(value) =>
-                    setFormData({
-                      ...formData,
-                      capacidade: Number(value) || 40,
-                    })
-                  }
+                  required
+                  defaultValue={editingBus?.capacidade}
                 />
               </Grid.Col>
             </Grid>
 
-            <Select
-              label="Status"
-              placeholder="Selecione o status"
-              required
-              data={[
-                { value: "Ativo", label: "Ativo" },
-                { value: "Manutenção", label: "Manutenção" },
-                { value: "Inativo", label: "Inativo" },
-              ]}
-              value={formData.status}
-              onChange={(value) =>
-                setFormData({
-                  ...formData,
-                  status:
-                    (value as "Ativo" | "Manutenção" | "Inativo") || "Ativo",
-                })
-              }
-            />
-
             <Group justify="flex-end" mt="md">
-              <Button
-                variant="subtle"
-                onClick={handleCloseModal}
-                disabled={isOperationLoading}
-              >
+              <Button variant="light" onClick={close} type="button">
                 Cancelar
               </Button>
               <Button type="submit" loading={isOperationLoading}>
-                {editingBus ? "Atualizar" : "Criar"}
+                {editingBus ? "Salvar" : "Criar"}
               </Button>
             </Group>
           </Stack>
         </form>
       </Modal>
-    </Container>
+    </Stack>
   );
 }
