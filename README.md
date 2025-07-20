@@ -115,14 +115,6 @@ Utiliza Mantine UI como base com customizações:
 - Paleta de cores padronizada
 - Tipografia responsiva
 
-## 🔐 Autenticação
-
-Sistema de autenticação com:
-
-- Login por email/senha
-- Recuperação de senha
-- Diferentes níveis de acesso (Admin, Aluno, Motorista)
-- Proteção de rotas
 
 ## 📊 API Integration
 
