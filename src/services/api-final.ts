@@ -95,9 +95,10 @@ export interface Payment {
   studentName?: string;
   amount: number;
   month: string;
+  monthLabel?: string; // Para exibição formatada no frontend
   year?: number;
   status: "Pago" | "Pendente" | "Atrasado";
-  paymentMethod?: "PIX" | "Cartão" | "Dinheiro" | "Transferência";
+  paymentMethod?: "Dinheiro" | "CartaoCredito" | "Pix" | "Transferencia";
   paymentDate?: string;
   dueDate?: string;
 }
@@ -430,7 +431,7 @@ export const driverService = {
   },
 };
 
-// 💰 Pagamentos - CORRIGIDO
+// 💰 Pagamentos - CORRIGIDO PARA ALINHAR COM SCRIPT DE TESTE
 export const paymentService = {
   getAll: async (studentId?: number, status?: string, month?: string) => {
     const params = new URLSearchParams();
@@ -445,13 +446,13 @@ export const paymentService = {
     return response.data;
   },
   create: async (data: Payment) => {
+    // Estrutura exata esperada pelo script de teste
     const response = await api.post("/payments", {
       studentId: data.studentId,
       amount: data.amount,
       month: data.month,
-      status: data.status,
-      paymentMethod: data.paymentMethod,
-      paymentDate: data.paymentDate,
+      status: data.status || "Pendente",
+      paymentMethod: data.paymentMethod || "Dinheiro",
     });
     return response.data;
   },
@@ -460,7 +461,6 @@ export const paymentService = {
       amount: data.amount,
       status: data.status,
       paymentMethod: data.paymentMethod,
-      paymentDate: data.paymentDate,
     });
     return response.data;
   },

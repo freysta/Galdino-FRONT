@@ -18,9 +18,7 @@ import {
   Pagination,
   Menu,
   Alert,
-  Textarea,
 } from "@mantine/core";
-// import { DateInput, TimeInput } from '@mantine/dates';
 import { useDisclosure } from "@mantine/hooks";
 import {
   IconPlus,
@@ -35,9 +33,29 @@ import {
   IconAlertCircle,
   IconCar,
 } from "@tabler/icons-react";
-
-import { useRoutes, useApiOperations, apiOperations } from "@/hooks/useApiData";
+import { notifications } from "@mantine/notifications";
+import {
+  useRoutes,
+  useCreateRoute,
+  useUpdateRoute,
+  useDeleteRoute,
+} from "@/hooks/useApi";
 import { Route } from "@/services/api";
+
+interface RouteForm {
+  name?: string;
+  destination: string;
+  origin: string;
+  date?: string;
+  time?: string;
+  departureTime: string;
+  driver?: string;
+  vehicle?: string;
+  price?: number;
+  capacity?: number;
+  status: string;
+  boardingPoints?: string[];
+}
 
 export default function RotasPage() {
   const [opened, { open, close }] = useDisclosure(false);
@@ -50,10 +68,21 @@ export default function RotasPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [editingRoute, setEditingRoute] = useState<Route | null>(null);
   const [routeToDelete, setRouteToDelete] = useState<Route | null>(null);
+  const [formData, setFormData] = useState<RouteForm>({
+    destination: "",
+    origin: "",
+    departureTime: "",
+    status: "scheduled",
+  });
 
-  // Usar a API real
-  const { data: routes, loading, error, refetch } = useRoutes();
-  const { execute, loading: operationLoading } = useApiOperations();
+  // Usar React Query hooks
+  const { data: routes = [], isLoading, error } = useRoutes();
+  const createRouteMutation = useCreateRoute();
+  const updateRouteMutation = useUpdateRoute();
+  const deleteRouteMutation = useDeleteRoute();
+
+  // Garantir que routes é um array
+  const routesArray = Array.isArray(routes) ? routes : [];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -85,27 +114,32 @@ export default function RotasPage() {
     }
   };
 
-  const filteredRoutes =
-    routes?.filter((route: Route) => {
-      const matchesSearch =
-        (route.destination &&
-          typeof route.destination === "string" &&
-          route.destination.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (route.origin &&
-          typeof route.origin === "string" &&
-          route.origin.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (route.driver &&
-          typeof route.driver === "string" &&
-          route.driver.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (route.name &&
-          typeof route.name === "string" &&
-          route.name.toLowerCase().includes(searchTerm.toLowerCase()));
-      const matchesStatus = !statusFilter || route.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    }) || [];
+  const filteredRoutes = routesArray.filter((route: Route) => {
+    const matchesSearch =
+      route.destination?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      route.origin?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      route.driver?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      route.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = !statusFilter || route.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const handleEdit = (route: Route) => {
     setEditingRoute(route);
+    setFormData({
+      name: route.name || "",
+      destination: route.destination || "",
+      origin: route.origin || "",
+      date: route.date || "",
+      time: route.time || "",
+      departureTime: route.departureTime || "",
+      driver: route.driver || "",
+      vehicle: route.vehicle || "",
+      price: route.price || 0,
+      capacity: route.capacity || 0,
+      status: route.status || "scheduled",
+      boardingPoints: route.boardingPoints || [],
+    });
     open();
   };
 
@@ -117,37 +151,81 @@ export default function RotasPage() {
   const handleDeleteConfirm = async () => {
     if (routeToDelete?.id) {
       try {
-        await execute(() => apiOperations.routes.delete(routeToDelete.id!));
+        await deleteRouteMutation.mutateAsync(routeToDelete.id);
+        notifications.show({
+          title: "Sucesso",
+          message: "Rota cancelada com sucesso!",
+          color: "green",
+        });
         setRouteToDelete(null);
         closeDeleteModal();
-        refetch();
-      } catch (error) {
-        alert("Erro ao excluir rota");
+      } catch {
+        notifications.show({
+          title: "Erro",
+          message: "Erro ao cancelar rota",
+          color: "red",
+        });
       }
     }
   };
 
   const handleAddNew = () => {
     setEditingRoute(null);
+    setFormData({
+      destination: "",
+      origin: "",
+      departureTime: "",
+      status: "scheduled",
+    });
     open();
   };
 
-  const handleSave = async (routeData: Partial<Route>) => {
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.destination || !formData.origin || !formData.departureTime) {
+      notifications.show({
+        title: "Erro",
+        message: "Destino, origem e horário são obrigatórios",
+        color: "red",
+      });
+      return;
+    }
+
     try {
       if (editingRoute?.id) {
-        await execute(() =>
-          apiOperations.routes.update(editingRoute.id!, routeData),
-        );
+        await updateRouteMutation.mutateAsync({
+          id: editingRoute.id,
+          data: formData,
+        });
+        notifications.show({
+          title: "Sucesso",
+          message: "Rota atualizada com sucesso!",
+          color: "green",
+        });
       } else {
-        await execute(() => apiOperations.routes.create(routeData as Route));
+        await createRouteMutation.mutateAsync(formData as Route);
+        notifications.show({
+          title: "Sucesso",
+          message: "Rota criada com sucesso!",
+          color: "green",
+        });
       }
       close();
       setEditingRoute(null);
-      refetch();
-    } catch (error) {
-      alert("Erro ao salvar rota");
+    } catch {
+      notifications.show({
+        title: "Erro",
+        message: "Erro ao salvar rota",
+        color: "red",
+      });
     }
   };
+
+  const isOperationLoading =
+    createRouteMutation.isPending ||
+    updateRouteMutation.isPending ||
+    deleteRouteMutation.isPending;
 
   const itemsPerPage = 10;
   const totalPages = Math.ceil(filteredRoutes.length / itemsPerPage);
@@ -157,11 +235,36 @@ export default function RotasPage() {
     startIndex + itemsPerPage,
   );
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Erro ao carregar rotas</p>
+          <Button onClick={() => window.location.reload()}>
+            Tentar Novamente
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Stack gap="lg">
       <Group justify="space-between">
         <Title order={1}>Gerenciar Rotas</Title>
-        <Button leftSection={<IconPlus size="1rem" />} onClick={handleAddNew}>
+        <Button
+          leftSection={<IconPlus size="1rem" />}
+          onClick={handleAddNew}
+          disabled={isOperationLoading}
+        >
           Adicionar Rota
         </Button>
       </Group>
@@ -201,126 +304,139 @@ export default function RotasPage() {
 
       {/* Tabela de rotas */}
       <Card withBorder padding="md">
-        <Table striped highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Rota</Table.Th>
-              <Table.Th>Data/Hora</Table.Th>
-              <Table.Th>Motorista/Veículo</Table.Th>
-              <Table.Th>Ocupação</Table.Th>
-              <Table.Th>Status</Table.Th>
-              <Table.Th>Ações</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {paginatedRoutes.map((route) => (
-              <Table.Tr key={route.id}>
-                <Table.Td>
-                  <div>
-                    <Text fw={500}>
-                      {route.destination || route.name || "Sem nome"}
-                    </Text>
-                    <Group gap="xs" mt="xs">
-                      <IconMapPin size="0.8rem" />
+        {filteredRoutes.length === 0 ? (
+          <Alert color="gray" mt="md">
+            {searchTerm || statusFilter
+              ? "Nenhuma rota encontrada"
+              : "Nenhuma rota cadastrada"}
+          </Alert>
+        ) : (
+          <>
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Rota</Table.Th>
+                  <Table.Th>Data/Hora</Table.Th>
+                  <Table.Th>Motorista/Veículo</Table.Th>
+                  <Table.Th>Ocupação</Table.Th>
+                  <Table.Th>Status</Table.Th>
+                  <Table.Th>Ações</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {paginatedRoutes.map((route: Route) => (
+                  <Table.Tr key={route.id}>
+                    <Table.Td>
+                      <div>
+                        <Text fw={500}>
+                          {route.destination || route.name || "Sem nome"}
+                        </Text>
+                        <Group gap="xs" mt="xs">
+                          <IconMapPin size="0.8rem" />
+                          <Text size="xs" c="dimmed">
+                            De: {route.origin || "N/A"}
+                          </Text>
+                        </Group>
+                        <Text size="xs" c="dimmed">
+                          R$ {route.price ? route.price.toFixed(2) : "0.00"}
+                        </Text>
+                      </div>
+                    </Table.Td>
+                    <Table.Td>
+                      <Stack gap="xs">
+                        <Text size="sm">
+                          {route.date
+                            ? new Date(route.date).toLocaleDateString("pt-BR")
+                            : "N/A"}
+                        </Text>
+                        <Group gap="xs">
+                          <IconClock size="0.8rem" />
+                          <Text size="sm">
+                            {route.time || route.departureTime || "N/A"}
+                          </Text>
+                        </Group>
+                      </Stack>
+                    </Table.Td>
+                    <Table.Td>
+                      <div>
+                        <Text size="sm" fw={500}>
+                          {route.driver || "Não atribuído"}
+                        </Text>
+                        <Group gap="xs" mt="xs">
+                          <IconCar size="0.8rem" />
+                          <Text size="xs" c="dimmed">
+                            {route.vehicle || "Não atribuído"}
+                          </Text>
+                        </Group>
+                      </div>
+                    </Table.Td>
+                    <Table.Td>
+                      <Group gap="xs">
+                        <IconUsers size="0.8rem" />
+                        <Text size="sm">
+                          {route.enrolled || 0}/{route.capacity || 0}
+                        </Text>
+                      </Group>
                       <Text size="xs" c="dimmed">
-                        De: {route.origin || "N/A"}
+                        {route.capacity
+                          ? Math.round(
+                              ((route.enrolled || 0) / route.capacity) * 100,
+                            )
+                          : 0}
+                        % ocupado
                       </Text>
-                    </Group>
-                    <Text size="xs" c="dimmed">
-                      R$ {route.price ? route.price.toFixed(2) : "0.00"}
-                    </Text>
-                  </div>
-                </Table.Td>
-                <Table.Td>
-                  <Stack gap="xs">
-                    <Text size="sm">
-                      {route.date
-                        ? new Date(route.date).toLocaleDateString("pt-BR")
-                        : "N/A"}
-                    </Text>
-                    <Group gap="xs">
-                      <IconClock size="0.8rem" />
-                      <Text size="sm">
-                        {route.time || route.departureTime || "N/A"}
-                      </Text>
-                    </Group>
-                  </Stack>
-                </Table.Td>
-                <Table.Td>
-                  <div>
-                    <Text size="sm" fw={500}>
-                      {route.driver || "Não atribuído"}
-                    </Text>
-                    <Group gap="xs" mt="xs">
-                      <IconCar size="0.8rem" />
-                      <Text size="xs" c="dimmed">
-                        {route.vehicle || "Não atribuído"}
-                      </Text>
-                    </Group>
-                  </div>
-                </Table.Td>
-                <Table.Td>
-                  <Group gap="xs">
-                    <IconUsers size="0.8rem" />
-                    <Text size="sm">
-                      {route.enrolled || 0}/{route.capacity || 0}
-                    </Text>
-                  </Group>
-                  <Text size="xs" c="dimmed">
-                    {route.capacity
-                      ? Math.round(
-                          ((route.enrolled || 0) / route.capacity) * 100,
-                        )
-                      : 0}
-                    % ocupado
-                  </Text>
-                </Table.Td>
-                <Table.Td>
-                  <Badge color={getStatusColor(route.status)} variant="light">
-                    {getStatusLabel(route.status)}
-                  </Badge>
-                </Table.Td>
-                <Table.Td>
-                  <Menu shadow="md" width={200}>
-                    <Menu.Target>
-                      <ActionIcon variant="subtle" color="gray">
-                        <IconDots size="1rem" />
-                      </ActionIcon>
-                    </Menu.Target>
-                    <Menu.Dropdown>
-                      <Menu.Item leftSection={<IconEye size="0.9rem" />}>
-                        Visualizar
-                      </Menu.Item>
-                      <Menu.Item
-                        leftSection={<IconEdit size="0.9rem" />}
-                        onClick={() => handleEdit(route)}
+                    </Table.Td>
+                    <Table.Td>
+                      <Badge
+                        color={getStatusColor(route.status)}
+                        variant="light"
                       >
-                        Editar
-                      </Menu.Item>
-                      <Menu.Divider />
-                      <Menu.Item
-                        color="red"
-                        leftSection={<IconTrash size="0.9rem" />}
-                        onClick={() => handleDeleteClick(route)}
-                      >
-                        Cancelar
-                      </Menu.Item>
-                    </Menu.Dropdown>
-                  </Menu>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+                        {getStatusLabel(route.status)}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <Menu shadow="md" width={200}>
+                        <Menu.Target>
+                          <ActionIcon variant="subtle" color="gray">
+                            <IconDots size="1rem" />
+                          </ActionIcon>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                          <Menu.Item leftSection={<IconEye size="0.9rem" />}>
+                            Visualizar
+                          </Menu.Item>
+                          <Menu.Item
+                            leftSection={<IconEdit size="0.9rem" />}
+                            onClick={() => handleEdit(route)}
+                          >
+                            Editar
+                          </Menu.Item>
+                          <Menu.Divider />
+                          <Menu.Item
+                            color="red"
+                            leftSection={<IconTrash size="0.9rem" />}
+                            onClick={() => handleDeleteClick(route)}
+                          >
+                            Cancelar
+                          </Menu.Item>
+                        </Menu.Dropdown>
+                      </Menu>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
 
-        {totalPages > 1 && (
-          <Group justify="center" mt="md">
-            <Pagination
-              value={currentPage}
-              onChange={setCurrentPage}
-              total={totalPages}
-            />
-          </Group>
+            {totalPages > 1 && (
+              <Group justify="center" mt="md">
+                <Pagination
+                  value={currentPage}
+                  onChange={setCurrentPage}
+                  total={totalPages}
+                />
+              </Group>
+            )}
+          </>
         )}
       </Card>
 
@@ -331,108 +447,121 @@ export default function RotasPage() {
         title={editingRoute ? "Editar Rota" : "Adicionar Rota"}
         size="lg"
       >
-        <Stack gap="md">
-          <Grid>
-            <Grid.Col span={12}>
-              <TextInput
-                label="Destino"
-                placeholder="Ex: Campus Norte - UNIFESP"
-                required
-                defaultValue={editingRoute?.destination}
-              />
-            </Grid.Col>
-            <Grid.Col span={12}>
-              <TextInput
-                label="Origem"
-                placeholder="Ex: Terminal Rodoviário"
-                required
-                defaultValue={editingRoute?.origin}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <TextInput
-                label="Data"
-                placeholder="DD/MM/AAAA"
-                required
-                defaultValue={editingRoute?.date}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <TextInput
-                label="Horário"
-                placeholder="HH:MM"
-                required
-                defaultValue={editingRoute?.time}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <Select
-                label="Motorista"
-                placeholder="Selecione um motorista"
-                data={[
-                  { value: "carlos", label: "Carlos Santos Silva" },
-                  { value: "maria", label: "Maria Oliveira Costa" },
-                  { value: "joao", label: "João Pereira Lima" },
-                  { value: "ana", label: "Ana Paula Rodrigues" },
-                ]}
-                required
-                defaultValue={editingRoute?.driver}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <Select
-                label="Veículo"
-                placeholder="Selecione um veículo"
-                data={[
-                  { value: "onibus-001", label: "Ônibus 001 (40 lugares)" },
-                  { value: "onibus-002", label: "Ônibus 002 (35 lugares)" },
-                  { value: "onibus-003", label: "Ônibus 003 (40 lugares)" },
-                  { value: "van-001", label: "Van 001 (15 lugares)" },
-                ]}
-                required
-                defaultValue={editingRoute?.vehicle}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <TextInput
-                label="Preço (R$)"
-                placeholder="15.00"
-                required
-                defaultValue={editingRoute?.price?.toString()}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 6 }}>
-              <Select
-                label="Status"
-                placeholder="Selecione o status"
-                data={[
-                  { value: "scheduled", label: "Agendada" },
-                  { value: "in_progress", label: "Em andamento" },
-                  { value: "completed", label: "Concluída" },
-                  { value: "cancelled", label: "Cancelada" },
-                ]}
-                required
-                defaultValue={editingRoute?.status}
-              />
-            </Grid.Col>
-            <Grid.Col span={12}>
-              <Textarea
-                label="Pontos de embarque"
-                placeholder="Digite os pontos de embarque separados por vírgula"
-                defaultValue={editingRoute?.boardingPoints?.join(", ")}
-              />
-            </Grid.Col>
-          </Grid>
+        <form onSubmit={handleSave}>
+          <Stack gap="md">
+            <Grid>
+              <Grid.Col span={12}>
+                <TextInput
+                  label="Destino"
+                  placeholder="Ex: Campus Norte - UNIFESP"
+                  required
+                  value={formData.destination}
+                  onChange={(e) =>
+                    setFormData({ ...formData, destination: e.target.value })
+                  }
+                />
+              </Grid.Col>
+              <Grid.Col span={12}>
+                <TextInput
+                  label="Origem"
+                  placeholder="Ex: Terminal Rodoviário"
+                  required
+                  value={formData.origin}
+                  onChange={(e) =>
+                    setFormData({ ...formData, origin: e.target.value })
+                  }
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="Data"
+                  placeholder="YYYY-MM-DD"
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) =>
+                    setFormData({ ...formData, date: e.target.value })
+                  }
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="Horário de Partida"
+                  placeholder="HH:MM"
+                  required
+                  value={formData.departureTime}
+                  onChange={(e) =>
+                    setFormData({ ...formData, departureTime: e.target.value })
+                  }
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="Motorista"
+                  placeholder="Nome do motorista"
+                  value={formData.driver}
+                  onChange={(e) =>
+                    setFormData({ ...formData, driver: e.target.value })
+                  }
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="Veículo"
+                  placeholder="Ex: Ônibus 001"
+                  value={formData.vehicle}
+                  onChange={(e) =>
+                    setFormData({ ...formData, vehicle: e.target.value })
+                  }
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="Preço (R$)"
+                  placeholder="15.00"
+                  type="number"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      price: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <Select
+                  label="Status"
+                  placeholder="Selecione o status"
+                  data={[
+                    { value: "scheduled", label: "Agendada" },
+                    { value: "in_progress", label: "Em andamento" },
+                    { value: "completed", label: "Concluída" },
+                    { value: "cancelled", label: "Cancelada" },
+                  ]}
+                  required
+                  value={formData.status}
+                  onChange={(value) =>
+                    setFormData({ ...formData, status: value || "scheduled" })
+                  }
+                />
+              </Grid.Col>
+            </Grid>
 
-          <Group justify="flex-end" mt="md">
-            <Button variant="light" onClick={close}>
-              Cancelar
-            </Button>
-            <Button onClick={close}>
-              {editingRoute ? "Salvar" : "Adicionar"}
-            </Button>
-          </Group>
-        </Stack>
+            <Group justify="flex-end" mt="md">
+              <Button
+                variant="light"
+                onClick={close}
+                disabled={isOperationLoading}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" loading={isOperationLoading}>
+                {editingRoute ? "Salvar" : "Adicionar"}
+              </Button>
+            </Group>
+          </Stack>
+        </form>
       </Modal>
 
       {/* Modal de confirmação de exclusão */}
@@ -456,7 +585,11 @@ export default function RotasPage() {
             <Button variant="light" onClick={closeDeleteModal}>
               Cancelar
             </Button>
-            <Button color="red" onClick={handleDeleteConfirm}>
+            <Button
+              color="red"
+              onClick={handleDeleteConfirm}
+              loading={deleteRouteMutation.isPending}
+            >
               Cancelar Rota
             </Button>
           </Group>

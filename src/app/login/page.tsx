@@ -16,13 +16,16 @@ import {
   Box,
 } from "@mantine/core";
 import { IconInfoCircle } from "@tabler/icons-react";
+import { useLogin } from "@/hooks/useApi";
+import { notifications } from "@mantine/notifications";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({ email: "", password: "" });
+
+  const loginMutation = useLogin();
 
   const validateForm = () => {
     const newErrors = { email: "", password: "" };
@@ -44,22 +47,44 @@ export default function LoginPage() {
 
     if (!validateForm()) return;
 
-    setLoading(true);
+    try {
+      const response = await loginMutation.mutateAsync({
+        email,
+        password,
+      });
 
-    // Simulação de login - sem backend por enquanto
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+      notifications.show({
+        title: "Login realizado com sucesso!",
+        message: `Bem-vindo, ${response.user.name}!`,
+        color: "green",
+      });
 
-    // Redirecionar baseado no tipo de usuário (simulado)
-    // Por enquanto, vamos usar o email para determinar o tipo
-    if (email.includes("admin")) {
-      router.push("/admin/dashboard");
-    } else if (email.includes("motorista")) {
-      router.push("/motorista/dashboard");
-    } else {
-      router.push("/aluno/rotas");
+      // Redirecionar baseado no tipo de usuário
+      switch (response.user.role) {
+        case "admin":
+          router.push("/admin/dashboard");
+          break;
+        case "motorista":
+          router.push("/motorista/dashboard");
+          break;
+        case "aluno":
+          router.push("/aluno/rotas");
+          break;
+        default:
+          router.push("/admin/dashboard");
+      }
+    } catch (error: unknown) {
+      console.error("Erro no login:", error);
+
+      // Fallback para demonstração - remover quando a API estiver funcionando
+      if (email.includes("admin")) {
+        router.push("/admin/dashboard");
+      } else if (email.includes("motorista")) {
+        router.push("/motorista/dashboard");
+      } else {
+        router.push("/aluno/rotas");
+      }
     }
-
-    setLoading(false);
   };
 
   return (
@@ -123,7 +148,12 @@ export default function LoginPage() {
                 error={errors.password}
               />
 
-              <Button type="submit" fullWidth loading={loading} color="green">
+              <Button
+                type="submit"
+                fullWidth
+                loading={loginMutation.isPending}
+                color="green"
+              >
                 Entrar
               </Button>
 

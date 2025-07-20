@@ -19,7 +19,6 @@ import {
   Loader,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { notifications } from "@mantine/notifications";
 import {
   IconUser,
   IconEdit,
@@ -33,6 +32,7 @@ import {
   IconCamera,
   IconSend,
 } from "@tabler/icons-react";
+import { notifications } from "@mantine/notifications";
 
 import {
   useCurrentUser,
@@ -45,35 +45,33 @@ import {
 
 export default function AlunoPerfilPage() {
   const [opened, { open, close }] = useDisclosure(false);
-  const [changeRequest, setChangeRequest] = useState("");
-  const [justification, setJustification] = useState("");
 
   // Usar dados do usuário logado
-  const {
-    data: currentUser,
-    isLoading: userLoading,
-    error: userError,
-  } = useCurrentUser();
-  const { data: routes = [], isLoading: routesLoading } = useRoutes();
-  const { data: attendance = [], isLoading: attendanceLoading } = useAttendance(
+  const { data: currentUser, isLoading: userLoading } = useCurrentUser();
+  const { data: routes, isLoading: routesLoading } = useRoutes();
+  const { data: attendance, isLoading: attendanceLoading } = useAttendance(
     currentUser?.id,
   );
   const updateProfileMutation = useUpdateProfile();
 
-  // Garantir que são arrays
-  const routesArray = Array.isArray(routes) ? routes : [];
-  const attendanceArray = Array.isArray(attendance) ? attendance : [];
+  // Estado para o formulário de solicitação de alteração
+  const [formData, setFormData] = useState({
+    changes: "",
+    justification: "",
+  });
+  const [formErrors, setFormErrors] = useState<{ changes?: string }>({});
 
   // Encontrar a rota do aluno baseada no ID do usuário
-  const studentRoute = routesArray.find((route: Route) => {
+  const studentRoute = routes?.find((route: Route) => {
     // Assumindo que existe uma relação entre usuário e rota
     // Isso pode precisar ser ajustado baseado na estrutura real da API
     return route.enrolled && route.enrolled > 0;
   });
 
   // Calcular estatísticas do aluno
-  const totalTrips = attendanceArray.length;
-  const presentTrips = attendanceArray.filter(
+  const studentAttendance = Array.isArray(attendance) ? attendance : [];
+  const totalTrips = studentAttendance.length;
+  const presentTrips = studentAttendance.filter(
     (att: Attendance) => att.status === "Presente",
   ).length;
   const attendanceRate =
@@ -113,20 +111,10 @@ export default function AlunoPerfilPage() {
     }
   };
 
-  const handleSubmitChangeRequest = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!changeRequest.trim()) {
-      notifications.show({
-        title: "Erro",
-        message: "Descreva as alterações que você precisa fazer.",
-        color: "red",
-      });
-      return;
-    }
-
+  const handleSubmitChangeRequest = async (values: typeof form.values) => {
     try {
-      // Simular envio da solicitação
+      // Aqui você pode implementar uma API específica para solicitações de alteração
+      // Por enquanto, vamos simular o envio
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       notifications.show({
@@ -136,10 +124,9 @@ export default function AlunoPerfilPage() {
         color: "green",
       });
 
-      setChangeRequest("");
-      setJustification("");
+      form.reset();
       close();
-    } catch {
+    } catch (error) {
       notifications.show({
         title: "Erro",
         message: "Não foi possível enviar sua solicitação. Tente novamente.",
@@ -157,7 +144,7 @@ export default function AlunoPerfilPage() {
     );
   }
 
-  if (userError || !currentUser) {
+  if (!currentUser) {
     return (
       <Alert icon={<IconInfoCircle size="1rem" />} color="red">
         <Text size="sm">
@@ -535,7 +522,7 @@ export default function AlunoPerfilPage() {
         title="Solicitar Alteração de Dados"
         size="lg"
       >
-        <form onSubmit={handleSubmitChangeRequest}>
+        <form onSubmit={form.onSubmit(handleSubmitChangeRequest)}>
           <Stack gap="md">
             <Alert icon={<IconInfoCircle size="1rem" />} color="blue">
               <Text size="sm">
@@ -554,16 +541,14 @@ export default function AlunoPerfilPage() {
               placeholder="Descreva detalhadamente as alterações que você precisa fazer..."
               rows={4}
               required
-              value={changeRequest}
-              onChange={(e) => setChangeRequest(e.target.value)}
+              {...form.getInputProps("changes")}
             />
 
             <Textarea
               label="Justificativa (opcional)"
               placeholder="Explique o motivo da alteração..."
               rows={3}
-              value={justification}
-              onChange={(e) => setJustification(e.target.value)}
+              {...form.getInputProps("justification")}
             />
 
             <Divider />

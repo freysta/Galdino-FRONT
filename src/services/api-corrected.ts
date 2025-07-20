@@ -206,21 +206,6 @@ export interface ResetPasswordRequest {
   email: string;
 }
 
-export interface ForgotPasswordRequest {
-  email: string;
-}
-
-export interface UpdateProfileRequest {
-  name: string;
-  email: string;
-  phone?: string;
-}
-
-export interface ChangePasswordRequest {
-  currentPassword: string;
-  newPassword: string;
-}
-
 // ===== INTERFACE PARA DASHBOARD =====
 export interface DashboardStats {
   totalStudents: number;

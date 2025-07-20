@@ -8,15 +8,14 @@ import {
   Card,
   Badge,
   Text,
-  Button,
   Grid,
   Alert,
   Timeline,
   ThemeIcon,
   Divider,
+  Loader,
 } from "@mantine/core";
 import {
-  IconRoute,
   IconClock,
   IconMapPin,
   IconUsers,
@@ -27,14 +26,27 @@ import {
   IconPhone,
 } from "@tabler/icons-react";
 
-import { useRoutes, useDrivers, useBoardingPoints } from "@/hooks/useApiData";
-import { Route, Driver, BoardingPoint } from "@/services/api";
+import {
+  useRoutes,
+  useDrivers,
+  useBoardingPoints,
+  type Route,
+  type Driver,
+  type BoardingPoint,
+} from "@/hooks/useApi";
+
+interface RouteStep {
+  time: string;
+  location: string;
+  description: string;
+  status: string;
+}
 
 export default function AlunoRotasPage() {
-  // Usar a API real
-  const { data: routes, loading: routesLoading } = useRoutes();
-  const { data: drivers, loading: driversLoading } = useDrivers();
-  const { data: boardingPoints, loading: boardingPointsLoading } =
+  // Usar a API real com React Query
+  const { data: routes, isLoading: routesLoading } = useRoutes();
+  const { data: drivers, isLoading: driversLoading } = useDrivers();
+  const { data: boardingPoints, isLoading: boardingPointsLoading } =
     useBoardingPoints();
 
   // Filtrar rotas ativas e futuras
@@ -115,7 +127,12 @@ export default function AlunoRotasPage() {
   };
 
   if (routesLoading || driversLoading || boardingPointsLoading) {
-    return <div>Carregando rotas...</div>;
+    return (
+      <Stack align="center" justify="center" h={400}>
+        <Loader size="lg" />
+        <Text>Carregando rotas...</Text>
+      </Stack>
+    );
   }
 
   return (
@@ -382,7 +399,7 @@ export default function AlunoRotasPage() {
                         Trajeto da Rota
                       </Text>
                       <Timeline active={0} bulletSize={20} lineWidth={2}>
-                        {routeSteps.map((step, index) => (
+                        {routeSteps.map((step: RouteStep, index: number) => (
                           <Timeline.Item
                             key={index}
                             bullet={

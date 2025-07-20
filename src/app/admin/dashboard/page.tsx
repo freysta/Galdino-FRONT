@@ -25,45 +25,46 @@ import {
   useNotifications,
   useRoutes,
   usePayments,
-} from "@/hooks/useApiData";
+} from "@/hooks/useApi";
 import { DashboardStats, Route, Payment, Notification } from "@/services/api";
 
 export default function AdminDashboard() {
-  // Usar a API real
-  const { data: dashboardStats, loading: statsLoading } = useDashboardStats();
-  const { data: notifications, loading: notificationsLoading } =
+  // Usar a API real com React Query
+  const { data: dashboardStats, isLoading: statsLoading } = useDashboardStats();
+  const { data: notifications, isLoading: notificationsLoading } =
     useNotifications();
-  const { data: routes, loading: routesLoading } = useRoutes();
-  const { data: payments, loading: paymentsLoading } = usePayments();
+  const { data: routes, isLoading: routesLoading } = useRoutes();
+  const { data: payments, isLoading: paymentsLoading } = usePayments();
+
+  // Garantir que os dados são arrays
+  const routesArray = Array.isArray(routes) ? routes : [];
+  const paymentsArray = Array.isArray(payments) ? payments : [];
+  const notificationsArray = Array.isArray(notifications) ? notifications : [];
 
   // Calcular estatísticas baseadas nos dados reais
   const stats = [
     {
       title: "Total de Alunos",
       value:
-        (
-          dashboardStats as unknown as DashboardStats
-        )?.totalStudents?.toString() || "0",
+        (dashboardStats as DashboardStats)?.totalStudents?.toString() || "0",
       diff: "+12%",
       icon: IconUsers,
       color: "blue",
     },
     {
       title: "Rotas do Dia",
-      value:
-        routes
-          ?.filter((route: Route) => route.status === "Ativo")
-          ?.length?.toString() || "0",
+      value: routesArray
+        .filter((route: Route) => route.status === "Ativo")
+        .length.toString(),
       diff: "+2",
       icon: IconRoute,
       color: "green",
     },
     {
       title: "Pagamentos Pendentes",
-      value:
-        payments
-          ?.filter((payment: Payment) => payment.status === "Pendente")
-          ?.length?.toString() || "0",
+      value: paymentsArray
+        .filter((payment: Payment) => payment.status === "Pendente")
+        .length.toString(),
       diff: "-5%",
       icon: IconCreditCard,
       color: "orange",
@@ -71,9 +72,7 @@ export default function AdminDashboard() {
     {
       title: "Motoristas Ativos",
       value:
-        (
-          dashboardStats as unknown as DashboardStats
-        )?.totalDrivers?.toString() || "0",
+        (dashboardStats as DashboardStats)?.totalDrivers?.toString() || "0",
       diff: "+1",
       icon: IconCar,
       color: "violet",
@@ -81,23 +80,22 @@ export default function AdminDashboard() {
   ];
 
   // Filtrar notificações recentes (últimas 4)
-  const recentNotifications = notifications?.slice(0, 4) || [];
+  const recentNotifications = notificationsArray.slice(0, 4);
 
   // Filtrar rotas de hoje
-  const todayRoutes = routes?.slice(0, 3) || [];
+  const todayRoutes = routesArray.slice(0, 3);
 
   // Calcular resumo financeiro
-  const totalRevenue =
-    payments
-      ?.filter((p: Payment) => p.status === "Pago")
-      ?.reduce((sum: number, p: Payment) => sum + p.amount, 0) || 0;
-  const pendingAmount =
-    payments
-      ?.filter((p: Payment) => p.status === "Pendente")
-      ?.reduce((sum: number, p: Payment) => sum + p.amount, 0) || 0;
-  const overdueCount =
-    payments?.filter((p: Payment) => p.status === "Atrasado")?.length || 0;
-  const totalPayments = payments?.length || 1;
+  const totalRevenue = paymentsArray
+    .filter((p: Payment) => p.status === "Pago")
+    .reduce((sum: number, p: Payment) => sum + p.amount, 0);
+  const pendingAmount = paymentsArray
+    .filter((p: Payment) => p.status === "Pendente")
+    .reduce((sum: number, p: Payment) => sum + p.amount, 0);
+  const overdueCount = paymentsArray.filter(
+    (p: Payment) => p.status === "Atrasado",
+  ).length;
+  const totalPayments = paymentsArray.length || 1;
   const defaultRate = Math.round((overdueCount / totalPayments) * 100);
 
   if (
@@ -158,27 +156,33 @@ export default function AdminDashboard() {
               </Badge>
             </Group>
             <Stack gap="sm">
-              {recentNotifications.map((notification: Notification) => (
-                <Paper key={notification.id} p="sm" withBorder radius="sm">
-                  <Group justify="space-between" align="flex-start">
-                    <div style={{ flex: 1 }}>
-                      <Text size="sm" fw={500}>
-                        {notification.title}
-                      </Text>
+              {recentNotifications.length > 0 ? (
+                recentNotifications.map((notification: Notification) => (
+                  <Paper key={notification.id} p="sm" withBorder radius="sm">
+                    <Group justify="space-between" align="flex-start">
+                      <div style={{ flex: 1 }}>
+                        <Text size="sm" fw={500}>
+                          {notification.title}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {notification.message}
+                        </Text>
+                      </div>
                       <Text size="xs" c="dimmed">
-                        {notification.message}
+                        {notification.createdAt
+                          ? new Date(notification.createdAt).toLocaleDateString(
+                              "pt-BR",
+                            )
+                          : "N/A"}
                       </Text>
-                    </div>
-                    <Text size="xs" c="dimmed">
-                      {notification.createdAt
-                        ? new Date(notification.createdAt).toLocaleDateString(
-                            "pt-BR",
-                          )
-                        : "N/A"}
-                    </Text>
-                  </Group>
-                </Paper>
-              ))}
+                    </Group>
+                  </Paper>
+                ))
+              ) : (
+                <Text c="dimmed" ta="center" py="xl">
+                  Nenhuma notificação recente
+                </Text>
+              )}
             </Stack>
           </Card>
         </Grid.Col>
@@ -190,37 +194,44 @@ export default function AdminDashboard() {
               Rotas de Hoje
             </Text>
             <Stack gap="sm">
-              {todayRoutes.map((route: Route) => (
-                <Paper key={route.id} p="sm" withBorder radius="sm">
-                  <Group justify="space-between" align="center">
-                    <div>
-                      <Text size="sm" fw={500}>
-                        {route.destination || route.name || "Rota sem nome"}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        Motorista: {route.driver || "N/A"}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        {route.enrolled || 0} alunos •{" "}
-                        {route.departureTime || route.time || "N/A"}
-                      </Text>
-                    </div>
-                    <Badge
-                      color={
-                        route.status === "Concluída" || route.status === "Ativo"
-                          ? "green"
-                          : route.status === "Em andamento"
-                            ? "blue"
-                            : "gray"
-                      }
-                      variant="light"
-                      size="sm"
-                    >
-                      {route.status || "Indefinido"}
-                    </Badge>
-                  </Group>
-                </Paper>
-              ))}
+              {todayRoutes.length > 0 ? (
+                todayRoutes.map((route: Route) => (
+                  <Paper key={route.id} p="sm" withBorder radius="sm">
+                    <Group justify="space-between" align="center">
+                      <div>
+                        <Text size="sm" fw={500}>
+                          {route.destination || route.name || "Rota sem nome"}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          Motorista: {route.driver || "N/A"}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {route.enrolled || 0} alunos •{" "}
+                          {route.departureTime || route.time || "N/A"}
+                        </Text>
+                      </div>
+                      <Badge
+                        color={
+                          route.status === "Concluída" ||
+                          route.status === "Ativo"
+                            ? "green"
+                            : route.status === "Em andamento"
+                              ? "blue"
+                              : "gray"
+                        }
+                        variant="light"
+                        size="sm"
+                      >
+                        {route.status || "Indefinido"}
+                      </Badge>
+                    </Group>
+                  </Paper>
+                ))
+              ) : (
+                <Text c="dimmed" ta="center" py="xl">
+                  Nenhuma rota programada para hoje
+                </Text>
+              )}
             </Stack>
           </Card>
         </Grid.Col>
@@ -257,8 +268,10 @@ export default function AdminDashboard() {
             </Text>
             <Progress value={15} color="orange" size="sm" mt="xs" />
             <Text size="xs" c="dimmed" mt="xs">
-              {payments?.filter((p: Payment) => p.status === "Pendente")
-                ?.length || 0}{" "}
+              {
+                paymentsArray.filter((p: Payment) => p.status === "Pendente")
+                  .length
+              }{" "}
               alunos pendentes
             </Text>
           </div>

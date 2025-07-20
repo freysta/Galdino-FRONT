@@ -20,27 +20,28 @@ import {
   IconClock,
   IconMapPin,
   IconCheck,
-  IconAlertCircle,
   IconCar,
 } from "@tabler/icons-react";
 
-import { useRoutes, useAttendance, useBuses } from "@/hooks/useApiData";
-import { Route, Attendance, Bus } from "@/services/api";
+import { useRoutes, useAttendance, useBuses } from "@/hooks/useApi";
+import { Route } from "@/services/api";
 
 export default function MotoristaDashboard() {
-  // Usar a API real
-  const { data: routes, loading: routesLoading } = useRoutes();
-  const { data: attendance, loading: attendanceLoading } = useAttendance();
-  const { data: buses, loading: busesLoading } = useBuses();
+  // Usar a API real com React Query
+  const { data: routes, isLoading: routesLoading } = useRoutes();
+  const { data: attendance, isLoading: attendanceLoading } = useAttendance();
+  const { data: buses, isLoading: busesLoading } = useBuses();
+
+  // Garantir que os dados são arrays
+  const routesArray = Array.isArray(routes) ? routes : [];
+  const attendanceArray = Array.isArray(attendance) ? attendance : [];
+  const busesArray = Array.isArray(buses) ? buses : [];
 
   // Filtrar rotas do dia atual
   const today = new Date().toISOString().split("T")[0];
-  const todayRoutes =
-    routes
-      ?.filter(
-        (route: Route) => route.date === today || route.status === "Ativo",
-      )
-      .slice(0, 3) || [];
+  const todayRoutes = routesArray
+    .filter((route: Route) => route.date === today || route.status === "Ativo")
+    .slice(0, 3);
 
   // Calcular estatísticas
   const totalStudentsToday = todayRoutes.reduce(
@@ -95,14 +96,14 @@ export default function MotoristaDashboard() {
     {
       time: "07:15",
       title: "Presença confirmada",
-      description: `${attendance?.length || 0} presenças registradas`,
+      description: `${attendanceArray.length} presenças registradas`,
       color: "orange",
       icon: IconUsers,
     },
   ];
 
   // Informações do primeiro ônibus (pode ser expandido para o ônibus do motorista)
-  const currentBus = buses?.[0] || null;
+  const currentBus = busesArray[0] || null;
 
   const getStatusColor = (status: string) => {
     switch (status) {

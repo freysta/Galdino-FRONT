@@ -14,7 +14,6 @@ import {
   Select,
   Divider,
   Alert,
-  Loader,
 } from "@mantine/core";
 import {
   IconBell,
@@ -26,34 +25,30 @@ import {
   IconSettings,
   IconMarkdown,
 } from "@tabler/icons-react";
-import { notifications } from "@mantine/notifications";
 
 import {
   useNotifications,
-  useMarkNotificationAsRead,
-  type Notification,
-} from "@/hooks/useApi";
+  useApiOperations,
+  apiOperations,
+} from "@/hooks/useApiData";
+import { Notification } from "@/services/api";
 
 export default function AlunoNotificacoesPage() {
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [readFilter, setReadFilter] = useState<string | null>(null);
 
-  // Usar React Query hooks
-  const { data: notificationsData = [], isLoading, error } = useNotifications();
-  const markAsReadMutation = useMarkNotificationAsRead();
-
-  // Garantir que é um array
-  const allNotifications = Array.isArray(notificationsData)
-    ? notificationsData
-    : [];
+  // Usar a API real
+  const { data: notifications, loading, refetch } = useNotifications();
+  const { execute, loading: operationLoading } = useApiOperations();
 
   // Filtrar notificações para o aluno (simulado - pode ser expandido com filtro por usuário)
-  const studentNotifications = allNotifications.filter(
-    (notification: Notification) =>
-      notification.recipient === "Aluno" ||
-      notification.recipient === "Todos" ||
-      !notification.recipient,
-  );
+  const studentNotifications =
+    notifications?.filter(
+      (notification: Notification) =>
+        notification.recipient === "Aluno" ||
+        notification.recipient === "Todos" ||
+        !notification.recipient,
+    ) || [];
 
   const getTypeColor = (type: string) => {
     switch (type) {
@@ -111,18 +106,12 @@ export default function AlunoNotificacoesPage() {
 
   const handleMarkAsRead = async (notificationId: number) => {
     try {
-      await markAsReadMutation.mutateAsync(notificationId);
-      notifications.show({
-        title: "Sucesso",
-        message: "Notificação marcada como lida!",
-        color: "green",
-      });
-    } catch {
-      notifications.show({
-        title: "Erro",
-        message: "Erro ao marcar notificação como lida",
-        color: "red",
-      });
+      await execute(() =>
+        apiOperations.notifications.markAsRead(notificationId),
+      );
+      refetch();
+    } catch (error) {
+      console.error("Erro ao marcar notificação como lida:", error);
     }
   };
 
@@ -131,43 +120,22 @@ export default function AlunoNotificacoesPage() {
       const unreadNotifications = studentNotifications.filter(
         (n: Notification) => !n.isRead,
       );
-
       const promises = unreadNotifications.map((notification: Notification) =>
-        markAsReadMutation.mutateAsync(notification.id!),
+        execute(() => apiOperations.notifications.markAsRead(notification.id!)),
       );
-
       await Promise.all(promises);
-
-      notifications.show({
-        title: "Sucesso",
-        message: "Todas as notificações foram marcadas como lidas!",
-        color: "green",
-      });
-    } catch {
-      notifications.show({
-        title: "Erro",
-        message: "Erro ao marcar todas as notificações como lidas",
-        color: "red",
-      });
+      refetch();
+    } catch (error) {
+      console.error("Erro ao marcar todas as notificações como lidas:", error);
     }
   };
 
   const handleDelete = async (notificationId: number) => {
-    if (confirm("Tem certeza que deseja excluir esta notificação?")) {
-      try {
-        // Simular exclusão - em produção, implementar hook específico
-        notifications.show({
-          title: "Funcionalidade em desenvolvimento",
-          message: "A exclusão de notificações estará disponível em breve.",
-          color: "blue",
-        });
-      } catch {
-        notifications.show({
-          title: "Erro",
-          message: "Erro ao excluir notificação",
-          color: "red",
-        });
-      }
+    try {
+      await execute(() => apiOperations.notifications.delete(notificationId));
+      refetch();
+    } catch (error) {
+      console.error("Erro ao excluir notificação:", error);
     }
   };
 
@@ -175,25 +143,8 @@ export default function AlunoNotificacoesPage() {
     (n: Notification) => !n.isRead,
   ).length;
 
-  const isOperationLoading = markAsReadMutation.isPending;
-
-  if (isLoading) {
-    return (
-      <Stack align="center" justify="center" h={400}>
-        <Loader size="lg" />
-        <Text>Carregando notificações...</Text>
-      </Stack>
-    );
-  }
-
-  if (error) {
-    return (
-      <Alert icon={<IconAlertCircle size="1rem" />} color="red">
-        <Text size="sm">
-          Erro ao carregar notificações. Tente recarregar a página.
-        </Text>
-      </Alert>
-    );
+  if (loading) {
+    return <div>Carregando notificações...</div>;
   }
 
   return (
@@ -213,7 +164,7 @@ export default function AlunoNotificacoesPage() {
             <Button
               leftSection={<IconMarkdown size="1rem" />}
               onClick={handleMarkAllAsRead}
-              loading={isOperationLoading}
+              loading={operationLoading}
             >
               Marcar todas como lidas
             </Button>
@@ -390,7 +341,7 @@ export default function AlunoNotificacoesPage() {
                             size="xs"
                             variant="light"
                             onClick={() => handleMarkAsRead(notification.id!)}
-                            loading={isOperationLoading}
+                            loading={operationLoading}
                           >
                             Marcar como lida
                           </Button>
@@ -400,7 +351,7 @@ export default function AlunoNotificacoesPage() {
                           color="red"
                           size="sm"
                           onClick={() => handleDelete(notification.id!)}
-                          loading={isOperationLoading}
+                          loading={operationLoading}
                         >
                           <IconTrash size="0.8rem" />
                         </ActionIcon>

@@ -27,7 +27,7 @@ import {
   RotaAluno,
   LoginRequest,
   ResetPasswordRequest,
-} from "@/services/api-final";
+} from "@/services/api";
 
 // ===== STUDENTS =====
 export const useStudents = (status?: string, route?: number) => {
@@ -606,4 +606,4 @@ export const useLogout = () => {
 };
 
 // Exportar também os tipos e enums do serviço
-export * from "@/services/api-final";
+export * from "@/services/api";

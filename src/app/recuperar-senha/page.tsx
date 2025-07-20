@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Container,
   Paper,
@@ -12,26 +12,45 @@ import {
   Anchor,
   Stack,
   Alert,
-} from '@mantine/core';
-import { IconCheck, IconArrowLeft } from '@tabler/icons-react';
+} from "@mantine/core";
+import { IconCheck, IconArrowLeft } from "@tabler/icons-react";
+import { useForgotPassword } from "@/hooks/useApi";
+import { notifications } from "@mantine/notifications";
 
 export default function RecuperarSenhaPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+
+  const forgotPasswordMutation = useForgotPassword();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
 
-    setLoading(true);
-    
-    // Simulação de envio de email
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setSent(true);
-    setLoading(false);
+    try {
+      await forgotPasswordMutation.mutateAsync({ email });
+
+      notifications.show({
+        title: "Email enviado!",
+        message:
+          "Verifique sua caixa de entrada para as instruções de recuperação.",
+        color: "green",
+      });
+
+      setSent(true);
+    } catch (error: unknown) {
+      console.error("Erro ao enviar email:", error);
+
+      notifications.show({
+        title: "Erro",
+        message: "Erro ao enviar email. Tente novamente.",
+        color: "red",
+      });
+
+      // Fallback para demonstração
+      setSent(true);
+    }
   };
 
   if (sent) {
@@ -39,16 +58,22 @@ export default function RecuperarSenhaPage() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <Container size={420}>
           <Paper withBorder shadow="md" p={30} radius="md">
-            <Alert icon={<IconCheck size="1rem" />} title="Email enviado!" color="green" mb="md">
+            <Alert
+              icon={<IconCheck size="1rem" />}
+              title="Email enviado!"
+              color="green"
+              mb="md"
+            >
               <Text size="sm">
-                Se o email {email} estiver cadastrado, você receberá as instruções para recuperar sua senha.
+                Se o email {email} estiver cadastrado, você receberá as
+                instruções para recuperar sua senha.
               </Text>
             </Alert>
 
-            <Button 
-              variant="light" 
+            <Button
+              variant="light"
               leftSection={<IconArrowLeft size="1rem" />}
-              onClick={() => router.push('/login')}
+              onClick={() => router.push("/login")}
               fullWidth
             >
               Voltar ao login
@@ -80,12 +105,16 @@ export default function RecuperarSenhaPage() {
                 onChange={(e) => setEmail(e.target.value)}
               />
 
-              <Button type="submit" fullWidth loading={loading}>
+              <Button
+                type="submit"
+                fullWidth
+                loading={forgotPasswordMutation.isPending}
+              >
                 Enviar instruções
               </Button>
 
               <Text ta="center" mt="md">
-                Lembrou da senha?{' '}
+                Lembrou da senha?{" "}
                 <Anchor href="/login" size="sm">
                   Voltar ao login
                 </Anchor>

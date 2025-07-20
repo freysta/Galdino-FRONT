@@ -34,10 +34,12 @@ import {
 } from "@tabler/icons-react";
 import {
   useDrivers,
-  useApiOperations,
-  apiOperations,
-} from "@/hooks/useApiData";
+  useCreateDriver,
+  useUpdateDriver,
+  useDeleteDriver,
+} from "@/hooks/useApi";
 import { Driver } from "@/services/api";
+import { notifications } from "@mantine/notifications";
 
 export default function MotoristasPage() {
   const [opened, { open, close }] = useDisclosure(false);
@@ -51,9 +53,14 @@ export default function MotoristasPage() {
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
   const [driverToDelete, setDriverToDelete] = useState<Driver | null>(null);
 
-  // Usar a API real
-  const { data: drivers, loading, error, refetch } = useDrivers();
-  const { execute, loading: operationLoading } = useApiOperations();
+  // Usar React Query
+  const { data: drivers = [], isLoading, error } = useDrivers();
+  const createDriverMutation = useCreateDriver();
+  const updateDriverMutation = useUpdateDriver();
+  const deleteDriverMutation = useDeleteDriver();
+
+  // Garantir que drivers é um array
+  const driversArray = Array.isArray(drivers) ? drivers : [];
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -77,14 +84,14 @@ export default function MotoristasPage() {
       case "suspenso":
         return "Suspenso";
       default:
-        status || "Desconhecido";
+        return status || "Desconhecido";
     }
   };
 
-  const filteredDrivers = drivers.filter((driver) => {
+  const filteredDrivers = driversArray.filter((driver: Driver) => {
     const matchesSearch =
-      driver.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      driver.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      driver.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      driver.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (driver.cnh && driver.cnh.includes(searchTerm));
     const matchesStatus =
       !statusFilter ||
@@ -105,12 +112,20 @@ export default function MotoristasPage() {
   const handleDeleteConfirm = async () => {
     if (driverToDelete?.id) {
       try {
-        await execute(() => apiOperations.drivers.delete(driverToDelete.id!));
+        await deleteDriverMutation.mutateAsync(driverToDelete.id);
+        notifications.show({
+          title: "Sucesso",
+          message: "Motorista excluído com sucesso!",
+          color: "green",
+        });
         setDriverToDelete(null);
         closeDeleteModal();
-        refetch();
-      } catch (error) {
-        alert("Erro ao excluir motorista");
+      } catch {
+        notifications.show({
+          title: "Erro",
+          message: "Erro ao excluir motorista",
+          color: "red",
+        });
       }
     }
   };
@@ -123,19 +138,38 @@ export default function MotoristasPage() {
   const handleSave = async (driverData: Partial<Driver>) => {
     try {
       if (editingDriver?.id) {
-        await execute(() =>
-          apiOperations.drivers.update(editingDriver.id!, driverData),
-        );
+        await updateDriverMutation.mutateAsync({
+          id: editingDriver.id,
+          data: driverData,
+        });
+        notifications.show({
+          title: "Sucesso",
+          message: "Motorista atualizado com sucesso!",
+          color: "green",
+        });
       } else {
-        await execute(() => apiOperations.drivers.create(driverData as Driver));
+        await createDriverMutation.mutateAsync(driverData as Driver);
+        notifications.show({
+          title: "Sucesso",
+          message: "Motorista criado com sucesso!",
+          color: "green",
+        });
       }
       close();
       setEditingDriver(null);
-      refetch();
-    } catch (error) {
-      alert("Erro ao salvar motorista");
+    } catch {
+      notifications.show({
+        title: "Erro",
+        message: "Erro ao salvar motorista",
+        color: "red",
+      });
     }
   };
+
+  const isOperationLoading =
+    createDriverMutation.isPending ||
+    updateDriverMutation.isPending ||
+    deleteDriverMutation.isPending;
 
   const itemsPerPage = 10;
   const totalPages = Math.ceil(filteredDrivers.length / itemsPerPage);
@@ -145,7 +179,7 @@ export default function MotoristasPage() {
     startIndex + itemsPerPage,
   );
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
@@ -157,10 +191,10 @@ export default function MotoristasPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <p className="text-red-600 mb-4">
-            Erro ao carregar motoristas: {error}
-          </p>
-          <Button onClick={refetch}>Tentar Novamente</Button>
+          <p className="text-red-600 mb-4">Erro ao carregar motoristas</p>
+          <Button onClick={() => window.location.reload()}>
+            Tentar Novamente
+          </Button>
         </div>
       </div>
     );
@@ -173,7 +207,7 @@ export default function MotoristasPage() {
         <Button
           leftSection={<IconPlus size="1rem" />}
           onClick={handleAddNew}
-          disabled={operationLoading}
+          disabled={isOperationLoading}
         >
           Adicionar Motorista
         </Button>
@@ -225,90 +259,111 @@ export default function MotoristasPage() {
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {paginatedDrivers.map((driver) => (
-              <Table.Tr key={driver.id}>
-                <Table.Td>
-                  <div>
-                    <Text fw={500}>{driver.name}</Text>
-                    <Text size="xs" c="dimmed">
-                      CPF: {driver.cpf || "Não informado"}
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      Desde{" "}
-                      {driver.createdAt
-                        ? new Date(driver.createdAt).toLocaleDateString("pt-BR")
-                        : "N/A"}
-                    </Text>
-                  </div>
-                </Table.Td>
-                <Table.Td>
-                  <Stack gap="xs">
+            {paginatedDrivers.length > 0 ? (
+              paginatedDrivers.map((driver: Driver) => (
+                <Table.Tr key={driver.id}>
+                  <Table.Td>
+                    <div>
+                      <Text fw={500}>
+                        {driver.name || "Nome não informado"}
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        CPF: {driver.cpf || "Não informado"}
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        Desde{" "}
+                        {driver.createdAt &&
+                        typeof driver.createdAt === "string"
+                          ? new Date(driver.createdAt).toLocaleDateString(
+                              "pt-BR",
+                            )
+                          : "N/A"}
+                      </Text>
+                    </div>
+                  </Table.Td>
+                  <Table.Td>
+                    <Stack gap="xs">
+                      <Group gap="xs">
+                        <IconMail size="0.8rem" />
+                        <Text size="sm">{driver.email || "Não informado"}</Text>
+                      </Group>
+                      <Group gap="xs">
+                        <IconPhone size="0.8rem" />
+                        <Text size="sm">{driver.phone || "Não informado"}</Text>
+                      </Group>
+                    </Stack>
+                  </Table.Td>
+                  <Table.Td>
+                    <div>
+                      <Text size="sm" ff="monospace">
+                        {driver.cnh || "Não informado"}
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        Venc:{" "}
+                        {driver.licenseExpiry &&
+                        typeof driver.licenseExpiry === "string"
+                          ? new Date(driver.licenseExpiry).toLocaleDateString(
+                              "pt-BR",
+                            )
+                          : "N/A"}
+                      </Text>
+                    </div>
+                  </Table.Td>
+                  <Table.Td>
                     <Group gap="xs">
-                      <IconMail size="0.8rem" />
-                      <Text size="sm">{driver.email}</Text>
+                      <IconCar size="0.8rem" />
+                      <Text size="sm">{driver.vehicle || "Não atribuído"}</Text>
                     </Group>
-                    <Group gap="xs">
-                      <IconPhone size="0.8rem" />
-                      <Text size="sm">{driver.phone}</Text>
-                    </Group>
-                  </Stack>
-                </Table.Td>
-                <Table.Td>
-                  <div>
-                    <Text size="sm" ff="monospace">
-                      {driver.cnh || "Não informado"}
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      Venc:{" "}
-                      {driver.licenseExpiry
-                        ? new Date(driver.licenseExpiry).toLocaleDateString(
-                            "pt-BR",
-                          )
-                        : "N/A"}
-                    </Text>
-                  </div>
-                </Table.Td>
-                <Table.Td>
-                  <Group gap="xs">
-                    <IconCar size="0.8rem" />
-                    <Text size="sm">{driver.vehicle || "Não atribuído"}</Text>
-                  </Group>
-                </Table.Td>
-                <Table.Td>
-                  <Badge color={getStatusColor(driver.status)} variant="light">
-                    {getStatusLabel(driver.status)}
-                  </Badge>
-                </Table.Td>
-                <Table.Td>
-                  <Menu shadow="md" width={200}>
-                    <Menu.Target>
-                      <ActionIcon variant="subtle" color="gray">
-                        <IconDots size="1rem" />
-                      </ActionIcon>
-                    </Menu.Target>
-                    <Menu.Dropdown>
-                      <Menu.Item leftSection={<IconEye size="0.9rem" />}>
-                        Visualizar
-                      </Menu.Item>
-                      <Menu.Item
-                        leftSection={<IconEdit size="0.9rem" />}
-                        onClick={() => handleEdit(driver)}
-                      >
-                        Editar
-                      </Menu.Item>
-                      <Menu.Divider />
-                      <Menu.Item
-                        color="red"
-                        leftSection={<IconTrash size="0.9rem" />}
-                        onClick={() => handleDeleteClick(driver)}
-                      >
-                        Excluir
-                      </Menu.Item>
-                    </Menu.Dropdown>
-                  </Menu>
+                  </Table.Td>
+                  <Table.Td>
+                    <Badge
+                      color={getStatusColor(driver.status)}
+                      variant="light"
+                    >
+                      {getStatusLabel(driver.status)}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    <Menu shadow="md" width={200}>
+                      <Menu.Target>
+                        <ActionIcon variant="subtle" color="gray">
+                          <IconDots size="1rem" />
+                        </ActionIcon>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Item leftSection={<IconEye size="0.9rem" />}>
+                          Visualizar
+                        </Menu.Item>
+                        <Menu.Item
+                          leftSection={<IconEdit size="0.9rem" />}
+                          onClick={() => handleEdit(driver)}
+                        >
+                          Editar
+                        </Menu.Item>
+                        <Menu.Divider />
+                        <Menu.Item
+                          color="red"
+                          leftSection={<IconTrash size="0.9rem" />}
+                          onClick={() => handleDeleteClick(driver)}
+                        >
+                          Excluir
+                        </Menu.Item>
+                      </Menu.Dropdown>
+                    </Menu>
+                  </Table.Td>
+                </Table.Tr>
+              ))
+            ) : (
+              <Table.Tr>
+                <Table.Td colSpan={6} style={{ textAlign: "center" }}>
+                  <Text c="dimmed">
+                    {searchTerm || statusFilter
+                      ? "Nenhum motorista encontrado"
+                      : "Nenhum motorista cadastrado"}
+                  </Text>
                 </Table.Td>
               </Table.Tr>
-            ))}
+            )}
           </Table.Tbody>
         </Table>
 
@@ -334,7 +389,7 @@ export default function MotoristasPage() {
           driver={editingDriver}
           onSave={handleSave}
           onClose={close}
-          loading={operationLoading}
+          loading={isOperationLoading}
         />
       </Modal>
 
@@ -357,7 +412,11 @@ export default function MotoristasPage() {
             <Button variant="light" onClick={closeDeleteModal}>
               Cancelar
             </Button>
-            <Button color="red" onClick={handleDeleteConfirm}>
+            <Button
+              color="red"
+              onClick={handleDeleteConfirm}
+              loading={deleteDriverMutation.isPending}
+            >
               Excluir
             </Button>
           </Group>

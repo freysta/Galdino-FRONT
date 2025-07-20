@@ -16,11 +16,8 @@ import {
   Grid,
   Modal,
   ActionIcon,
-  Alert,
-  Loader,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { notifications } from "@mantine/notifications";
 import {
   IconSearch,
   IconEye,
@@ -31,32 +28,10 @@ import {
   IconCheck,
   IconX,
   IconAlertCircle,
-  IconInfoCircle,
 } from "@tabler/icons-react";
 
-import {
-  useAttendance,
-  useRoutes,
-  type Attendance,
-  type Route,
-} from "@/hooks/useApi";
-
-interface RouteHistory {
-  id: string;
-  date: string;
-  time: string;
-  destination: string;
-  origin: string;
-  studentsExpected: number;
-  studentsPresent: number;
-  studentsAbsent: number;
-  status: string;
-  duration: string;
-  distance: string;
-  observations: string;
-  routeData: Route;
-  attendanceData: Attendance[];
-}
+import { useAttendance, useRoutes } from "@/hooks/useApiData";
+import { Attendance, Route } from "@/services/api";
 
 export default function HistoricoPage() {
   const [opened, { open, close }] = useDisclosure(false);
@@ -64,30 +39,18 @@ export default function HistoricoPage() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedRoute, setSelectedRoute] = useState<RouteHistory | null>(null);
+  const [selectedRoute, setSelectedRoute] = useState<any>(null);
 
-  // Usar React Query hooks
-  const {
-    data: attendanceData = [],
-    isLoading: attendanceLoading,
-    error: attendanceError,
-  } = useAttendance();
-  const {
-    data: routesData = [],
-    isLoading: routesLoading,
-    error: routesError,
-  } = useRoutes();
-
-  // Garantir que são arrays
-  const attendance = Array.isArray(attendanceData) ? attendanceData : [];
-  const routes = Array.isArray(routesData) ? routesData : [];
+  // Usar a API real
+  const { data: attendance, loading: attendanceLoading } = useAttendance();
+  const { data: routes, loading: routesLoading } = useRoutes();
 
   // Processar dados para criar histórico de rotas
-  const processRouteHistory = (): RouteHistory[] => {
-    if (!routes.length || !attendance.length) return [];
+  const processRouteHistory = () => {
+    if (!routes || !attendance) return [];
 
     // Agrupar presenças por rota e data
-    const routeHistory: RouteHistory[] = [];
+    const routeHistory: any[] = [];
 
     routes.forEach((route: Route) => {
       // Filtrar presenças desta rota
@@ -197,17 +160,9 @@ export default function HistoricoPage() {
     return matchesSearch && matchesStatus && matchesDate;
   });
 
-  const handleViewDetails = (route: RouteHistory) => {
+  const handleViewDetails = (route: any) => {
     setSelectedRoute(route);
     open();
-  };
-
-  const handleExportReport = () => {
-    notifications.show({
-      title: "Funcionalidade em desenvolvimento",
-      message: "A exportação de relatórios estará disponível em breve.",
-      color: "blue",
-    });
   };
 
   const itemsPerPage = 10;
@@ -237,38 +192,14 @@ export default function HistoricoPage() {
     .reverse();
 
   if (attendanceLoading || routesLoading) {
-    return (
-      <Stack align="center" justify="center" h={400}>
-        <Loader size="lg" />
-        <Text>Carregando histórico...</Text>
-      </Stack>
-    );
-  }
-
-  if (attendanceError || routesError) {
-    return (
-      <Alert icon={<IconAlertCircle size="1rem" />} color="red">
-        <Text size="sm">
-          Erro ao carregar histórico. Tente recarregar a página.
-        </Text>
-      </Alert>
-    );
+    return <div>Carregando histórico...</div>;
   }
 
   return (
     <Stack gap="lg">
       <Group justify="space-between">
-        <div>
-          <Title order={1}>Histórico de Rotas</Title>
-          <Text c="dimmed">
-            Acompanhe o histórico completo das suas viagens realizadas
-          </Text>
-        </div>
-        <Button
-          leftSection={<IconDownload size="1rem" />}
-          variant="light"
-          onClick={handleExportReport}
-        >
+        <Title order={1}>Histórico de Rotas</Title>
+        <Button leftSection={<IconDownload size="1rem" />} variant="light">
           Exportar Relatório
         </Button>
       </Group>
@@ -277,62 +208,42 @@ export default function HistoricoPage() {
       <Grid>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Card withBorder padding="md">
-            <Group justify="space-between">
-              <div>
-                <Text size="sm" c="dimmed" mb="xs">
-                  Total de Rotas
-                </Text>
-                <Text size="xl" fw={700}>
-                  {totalRoutes}
-                </Text>
-              </div>
-              <IconClock size="2rem" color="blue" />
-            </Group>
+            <Text size="sm" c="dimmed" mb="xs">
+              Total de Rotas
+            </Text>
+            <Text size="xl" fw={700}>
+              {totalRoutes}
+            </Text>
           </Card>
         </Grid.Col>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Card withBorder padding="md">
-            <Group justify="space-between">
-              <div>
-                <Text size="sm" c="dimmed" mb="xs">
-                  Concluídas
-                </Text>
-                <Text size="xl" fw={700} c="green">
-                  {completedRoutes}
-                </Text>
-              </div>
-              <IconCheck size="2rem" color="green" />
-            </Group>
+            <Text size="sm" c="dimmed" mb="xs">
+              Concluídas
+            </Text>
+            <Text size="xl" fw={700} c="green">
+              {completedRoutes}
+            </Text>
           </Card>
         </Grid.Col>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Card withBorder padding="md">
-            <Group justify="space-between">
-              <div>
-                <Text size="sm" c="dimmed" mb="xs">
-                  Canceladas
-                </Text>
-                <Text size="xl" fw={700} c="red">
-                  {cancelledRoutes}
-                </Text>
-              </div>
-              <IconX size="2rem" color="red" />
-            </Group>
+            <Text size="sm" c="dimmed" mb="xs">
+              Canceladas
+            </Text>
+            <Text size="xl" fw={700} c="red">
+              {cancelledRoutes}
+            </Text>
           </Card>
         </Grid.Col>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Card withBorder padding="md">
-            <Group justify="space-between">
-              <div>
-                <Text size="sm" c="dimmed" mb="xs">
-                  Total Passageiros
-                </Text>
-                <Text size="xl" fw={700} c="blue">
-                  {totalStudents}
-                </Text>
-              </div>
-              <IconUsers size="2rem" color="blue" />
-            </Group>
+            <Text size="sm" c="dimmed" mb="xs">
+              Total Passageiros
+            </Text>
+            <Text size="xl" fw={700} c="blue">
+              {totalStudents}
+            </Text>
           </Card>
         </Grid.Col>
       </Grid>
@@ -384,15 +295,9 @@ export default function HistoricoPage() {
       {/* Tabela de histórico */}
       <Card withBorder padding="md">
         {paginatedRoutes.length === 0 ? (
-          <Stack align="center" gap="md" py="xl">
-            <IconInfoCircle size="3rem" color="gray" />
-            <Text c="dimmed" ta="center">
-              Nenhum histórico de rota encontrado
-            </Text>
-            <Text size="sm" c="dimmed" ta="center">
-              Os históricos aparecerão aqui conforme você realizar as viagens.
-            </Text>
-          </Stack>
+          <Text c="dimmed" ta="center" py="xl">
+            Nenhum histórico de rota encontrado
+          </Text>
         ) : (
           <Table striped highlightOnHover>
             <Table.Thead>
@@ -572,12 +477,6 @@ export default function HistoricoPage() {
                 </Grid.Col>
               )}
             </Grid>
-
-            <Group justify="flex-end" mt="md">
-              <Button variant="light" onClick={close}>
-                Fechar
-              </Button>
-            </Group>
           </Stack>
         )}
       </Modal>

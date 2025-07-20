@@ -15,10 +15,10 @@ import {
   ActionIcon,
   Menu,
   Text,
-  LoadingOverlay,
   Alert,
   Select,
   NumberInput,
+  Grid,
 } from "@mantine/core";
 import {
   IconPlus,
@@ -27,103 +27,132 @@ import {
   IconTrash,
   IconDots,
   IconBus,
-  IconCalendar,
-  IconTool,
 } from "@tabler/icons-react";
-import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import {
   useBuses,
   useCreateBus,
   useUpdateBus,
   useDeleteBus,
-  BusStatus,
-  type Bus,
-  formatDate,
 } from "@/hooks/useApi";
+import { Bus } from "@/services/api";
 
 interface BusForm {
-  plate: string;
-  model: string;
-  year: number;
-  capacity: number;
-  status: BusStatus;
-  lastMaintenance?: string;
-  nextMaintenance?: string;
+  placa: string;
+  modelo: string;
+  ano: number;
+  capacidade: number;
+  status: "Ativo" | "Manutenção" | "Inativo";
 }
 
 export default function BusesPage() {
   const [opened, setOpened] = useState(false);
   const [editingBus, setEditingBus] = useState<Bus | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<BusStatus | undefined>();
-
-  const { data: buses, isLoading } = useBuses(statusFilter);
-
-  const createMutation = useCreateBus();
-  const updateMutation = useUpdateBus();
-  const deleteMutation = useDeleteBus();
-
-  const form = useForm<BusForm>({
-    initialValues: {
-      plate: "",
-      model: "",
-      year: new Date().getFullYear(),
-      capacity: 40,
-      status: BusStatus.Ativo,
-      lastMaintenance: "",
-      nextMaintenance: "",
-    },
-    validate: {
-      plate: (value) => (!value ? "Placa é obrigatória" : null),
-      model: (value) => (!value ? "Modelo é obrigatório" : null),
-      year: (value) => {
-        const currentYear = new Date().getFullYear();
-        if (!value) return "Ano é obrigatório";
-        if (value < 1990 || value > currentYear + 1) return "Ano inválido";
-        return null;
-      },
-      capacity: (value) => {
-        if (!value) return "Capacidade é obrigatória";
-        if (value < 1 || value > 100)
-          return "Capacidade deve ser entre 1 e 100";
-        return null;
-      },
-    },
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [formData, setFormData] = useState<BusForm>({
+    placa: "",
+    modelo: "",
+    ano: new Date().getFullYear(),
+    capacidade: 40,
+    status: "Ativo",
   });
 
-  const handleSubmit = async (values: BusForm) => {
-    try {
-      const busData = {
-        ...values,
-        lastMaintenance: values.lastMaintenance || undefined,
-        nextMaintenance: values.nextMaintenance || undefined,
-      };
+  // Usar React Query hooks
+  const { data: buses = [], isLoading, error } = useBuses();
+  const createBusMutation = useCreateBus();
+  const updateBusMutation = useUpdateBus();
+  const deleteBusMutation = useDeleteBus();
 
+  // Garantir que buses é um array
+  const busesArray = Array.isArray(buses) ? buses : [];
+
+  const validateForm = () => {
+    if (!formData.placa) {
+      notifications.show({
+        title: "Erro",
+        message: "Placa é obrigatória",
+        color: "red",
+      });
+      return false;
+    }
+    if (!formData.modelo) {
+      notifications.show({
+        title: "Erro",
+        message: "Modelo é obrigatório",
+        color: "red",
+      });
+      return false;
+    }
+    if (
+      !formData.ano ||
+      formData.ano < 1990 ||
+      formData.ano > new Date().getFullYear() + 1
+    ) {
+      notifications.show({
+        title: "Erro",
+        message: "Ano inválido",
+        color: "red",
+      });
+      return false;
+    }
+    if (
+      !formData.capacidade ||
+      formData.capacidade < 1 ||
+      formData.capacidade > 100
+    ) {
+      notifications.show({
+        title: "Erro",
+        message: "Capacidade deve ser entre 1 e 100",
+        color: "red",
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) return;
+
+    try {
       if (editingBus) {
-        await updateMutation.mutateAsync({
-          id: editingBus.id,
-          data: busData,
+        await updateBusMutation.mutateAsync({
+          id: editingBus.id!,
+          data: formData,
+        });
+        notifications.show({
+          title: "Sucesso",
+          message: "Ônibus atualizado com sucesso!",
+          color: "green",
         });
       } else {
-        await createMutation.mutateAsync(busData);
+        await createBusMutation.mutateAsync(formData as Bus);
+        notifications.show({
+          title: "Sucesso",
+          message: "Ônibus criado com sucesso!",
+          color: "green",
+        });
       }
       handleCloseModal();
-    } catch (error) {
-      console.error("Erro ao salvar ônibus:", error);
+    } catch {
+      notifications.show({
+        title: "Erro",
+        message: "Erro ao salvar ônibus",
+        color: "red",
+      });
     }
   };
 
   const handleEdit = (bus: Bus) => {
     setEditingBus(bus);
-    form.setValues({
-      plate: bus.plate,
-      model: bus.model,
-      year: bus.year,
-      capacity: bus.capacity,
-      status: bus.status,
-      lastMaintenance: bus.lastMaintenance || "",
-      nextMaintenance: bus.nextMaintenance || "",
+    setFormData({
+      placa: bus.placa || "",
+      modelo: bus.modelo || "",
+      ano: bus.ano || new Date().getFullYear(),
+      capacidade: bus.capacidade || 40,
+      status: bus.status || "Ativo",
     });
     setOpened(true);
   };
@@ -131,9 +160,18 @@ export default function BusesPage() {
   const handleDelete = async (id: number) => {
     if (window.confirm("Tem certeza que deseja excluir este ônibus?")) {
       try {
-        await deleteMutation.mutateAsync(id);
-      } catch (error) {
-        console.error("Erro ao excluir ônibus:", error);
+        await deleteBusMutation.mutateAsync(id);
+        notifications.show({
+          title: "Sucesso",
+          message: "Ônibus excluído com sucesso!",
+          color: "green",
+        });
+      } catch {
+        notifications.show({
+          title: "Erro",
+          message: "Erro ao excluir ônibus",
+          color: "red",
+        });
       }
     }
   };
@@ -141,27 +179,61 @@ export default function BusesPage() {
   const handleCloseModal = () => {
     setOpened(false);
     setEditingBus(null);
-    form.reset();
+    setFormData({
+      placa: "",
+      modelo: "",
+      ano: new Date().getFullYear(),
+      capacidade: 40,
+      status: "Ativo",
+    });
   };
 
-  const filteredBuses = buses?.filter(
-    (bus) =>
-      bus.plate.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      bus.model.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const isOperationLoading =
+    createBusMutation.isPending ||
+    updateBusMutation.isPending ||
+    deleteBusMutation.isPending;
 
-  const getStatusBadgeColor = (status: BusStatus) => {
+  const filteredBuses = busesArray.filter((bus: Bus) => {
+    const matchesSearch =
+      bus.placa?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      bus.modelo?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = !statusFilter || bus.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const getStatusBadgeColor = (status: string) => {
     switch (status) {
-      case BusStatus.Ativo:
+      case "Ativo":
         return "green";
-      case BusStatus.Manutencao:
+      case "Manutenção":
         return "orange";
-      case BusStatus.Inativo:
+      case "Inativo":
         return "red";
       default:
         return "gray";
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Erro ao carregar ônibus</p>
+          <Button onClick={() => window.location.reload()}>
+            Tentar Novamente
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Container size="xl">
@@ -182,14 +254,12 @@ export default function BusesPage() {
             <Select
               placeholder="Filtrar por status"
               data={[
-                { value: BusStatus.Ativo, label: "Ativo" },
-                { value: BusStatus.Manutencao, label: "Manutenção" },
-                { value: BusStatus.Inativo, label: "Inativo" },
+                { value: "Ativo", label: "Ativo" },
+                { value: "Manutenção", label: "Manutenção" },
+                { value: "Inativo", label: "Inativo" },
               ]}
               value={statusFilter}
-              onChange={(value) =>
-                setStatusFilter(value as BusStatus | undefined)
-              }
+              onChange={setStatusFilter}
               clearable
               style={{ width: 200 }}
             />
@@ -197,72 +267,55 @@ export default function BusesPage() {
           <Button
             leftSection={<IconPlus size={16} />}
             onClick={() => setOpened(true)}
+            disabled={isOperationLoading}
           >
             Novo Ônibus
           </Button>
         </Group>
 
         <div style={{ position: "relative", minHeight: 400 }}>
-          <LoadingOverlay visible={isLoading} />
-
-          {!isLoading && filteredBuses?.length === 0 && (
+          {filteredBuses.length === 0 && (
             <Alert color="gray" mt="md">
-              Nenhum ônibus encontrado
+              {searchQuery || statusFilter
+                ? "Nenhum ônibus encontrado"
+                : "Nenhum ônibus cadastrado"}
             </Alert>
           )}
 
-          {filteredBuses && filteredBuses.length > 0 && (
+          {filteredBuses.length > 0 && (
             <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Veículo</Table.Th>
                   <Table.Th>Capacidade</Table.Th>
                   <Table.Th>Status</Table.Th>
-                  <Table.Th>Manutenção</Table.Th>
                   <Table.Th style={{ width: 80 }}>Ações</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {filteredBuses.map((bus) => (
+                {filteredBuses.map((bus: Bus) => (
                   <Table.Tr key={bus.id}>
                     <Table.Td>
                       <Group gap="xs">
                         <IconBus size={20} />
                         <div>
-                          <Text fw={500}>{bus.plate}</Text>
+                          <Text fw={500}>
+                            {bus.placa || "Placa não informada"}
+                          </Text>
                           <Text size="sm" c="dimmed">
-                            {bus.model} - {bus.year}
+                            {bus.modelo || "Modelo não informado"} -{" "}
+                            {bus.ano || "N/A"}
                           </Text>
                         </div>
                       </Group>
                     </Table.Td>
                     <Table.Td>
-                      <Text>{bus.capacity} lugares</Text>
+                      <Text>{bus.capacidade || 0} lugares</Text>
                     </Table.Td>
                     <Table.Td>
-                      <Badge color={getStatusBadgeColor(bus.status)}>
-                        {bus.status}
+                      <Badge color={getStatusBadgeColor(bus.status || "")}>
+                        {bus.status || "Indefinido"}
                       </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      <Stack gap={4}>
-                        {bus.lastMaintenance && (
-                          <Group gap="xs">
-                            <IconTool size={14} />
-                            <Text size="sm">
-                              Última: {formatDate(bus.lastMaintenance)}
-                            </Text>
-                          </Group>
-                        )}
-                        {bus.nextMaintenance && (
-                          <Group gap="xs">
-                            <IconCalendar size={14} />
-                            <Text size="sm" c="orange">
-                              Próxima: {formatDate(bus.nextMaintenance)}
-                            </Text>
-                          </Group>
-                        )}
-                      </Stack>
                     </Table.Td>
                     <Table.Td>
                       <Menu shadow="md" width={200}>
@@ -281,7 +334,7 @@ export default function BusesPage() {
                           <Menu.Item
                             color="red"
                             leftSection={<IconTrash size={14} />}
-                            onClick={() => handleDelete(bus.id)}
+                            onClick={() => handleDelete(bus.id!)}
                           >
                             Excluir
                           </Menu.Item>
@@ -302,72 +355,89 @@ export default function BusesPage() {
         title={editingBus ? "Editar Ônibus" : "Novo Ônibus"}
         size="md"
       >
-        <form onSubmit={form.onSubmit(handleSubmit)}>
+        <form onSubmit={handleSubmit}>
           <Stack>
             <TextInput
               label="Placa"
               placeholder="ABC-1234"
               required
-              {...form.getInputProps("plate")}
+              value={formData.placa}
+              onChange={(e) =>
+                setFormData({ ...formData, placa: e.target.value })
+              }
             />
 
             <TextInput
               label="Modelo"
               placeholder="Ex: Mercedes-Benz OF 1721"
               required
-              {...form.getInputProps("model")}
+              value={formData.modelo}
+              onChange={(e) =>
+                setFormData({ ...formData, modelo: e.target.value })
+              }
             />
 
-            <NumberInput
-              label="Ano"
-              placeholder="2024"
-              required
-              min={1990}
-              max={new Date().getFullYear() + 1}
-              {...form.getInputProps("year")}
-            />
-
-            <NumberInput
-              label="Capacidade"
-              placeholder="40"
-              required
-              min={1}
-              max={100}
-              {...form.getInputProps("capacity")}
-            />
+            <Grid>
+              <Grid.Col span={6}>
+                <NumberInput
+                  label="Ano"
+                  required
+                  min={1990}
+                  max={new Date().getFullYear() + 1}
+                  value={formData.ano}
+                  onChange={(value) =>
+                    setFormData({
+                      ...formData,
+                      ano: Number(value) || new Date().getFullYear(),
+                    })
+                  }
+                />
+              </Grid.Col>
+              <Grid.Col span={6}>
+                <NumberInput
+                  label="Capacidade"
+                  required
+                  min={1}
+                  max={100}
+                  value={formData.capacidade}
+                  onChange={(value) =>
+                    setFormData({
+                      ...formData,
+                      capacidade: Number(value) || 40,
+                    })
+                  }
+                />
+              </Grid.Col>
+            </Grid>
 
             <Select
               label="Status"
               placeholder="Selecione o status"
               required
               data={[
-                { value: BusStatus.Ativo, label: "Ativo" },
-                { value: BusStatus.Manutencao, label: "Manutenção" },
-                { value: BusStatus.Inativo, label: "Inativo" },
+                { value: "Ativo", label: "Ativo" },
+                { value: "Manutenção", label: "Manutenção" },
+                { value: "Inativo", label: "Inativo" },
               ]}
-              {...form.getInputProps("status")}
-            />
-
-            <TextInput
-              label="Última Manutenção (opcional)"
-              placeholder="YYYY-MM-DD"
-              {...form.getInputProps("lastMaintenance")}
-            />
-
-            <TextInput
-              label="Próxima Manutenção (opcional)"
-              placeholder="YYYY-MM-DD"
-              {...form.getInputProps("nextMaintenance")}
+              value={formData.status}
+              onChange={(value) =>
+                setFormData({
+                  ...formData,
+                  status:
+                    (value as "Ativo" | "Manutenção" | "Inativo") || "Ativo",
+                })
+              }
             />
 
             <Group justify="flex-end" mt="md">
-              <Button variant="subtle" onClick={handleCloseModal}>
+              <Button
+                variant="subtle"
+                onClick={handleCloseModal}
+                disabled={isOperationLoading}
+              >
                 Cancelar
               </Button>
-              <Button
-                type="submit"
-                loading={createMutation.isPending || updateMutation.isPending}
-              >
+              <Button type="submit" loading={isOperationLoading}>
                 {editingBus ? "Atualizar" : "Criar"}
               </Button>
             </Group>

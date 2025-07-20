@@ -15,9 +15,7 @@ import {
   Alert,
   Divider,
   ActionIcon,
-  Loader,
 } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
 import {
   IconUsers,
   IconCheck,
@@ -32,10 +30,11 @@ import {
 import {
   useRoutes,
   useStudents,
-  useMarkAttendance,
-  type Route,
-  type Student,
-} from "@/hooks/useApi";
+  useAttendance,
+  useApiOperations,
+  apiOperations,
+} from "@/hooks/useApiData";
+import { Route, Student, Attendance } from "@/services/api";
 
 export default function PresencasPage() {
   const [selectedRoute, setSelectedRoute] = useState<string>("");
@@ -46,34 +45,32 @@ export default function PresencasPage() {
     [key: number]: "present" | "absent" | null;
   }>({});
 
-  // Usar React Query hooks modernos
+  // Usar a API real
   const {
-    data: routes = [],
-    isLoading: routesLoading,
-    error: routesError,
+    data: routes,
+    loading: routesLoading,
+    refetch: refetchRoutes,
   } = useRoutes();
+  const { data: students, loading: studentsLoading } = useStudents();
   const {
-    data: students = [],
-    isLoading: studentsLoading,
-    error: studentsError,
-  } = useStudents();
-  const markAttendanceMutation = useMarkAttendance();
-
-  // Garantir que são arrays
-  const routesArray = Array.isArray(routes) ? routes : [];
-  const studentsArray = Array.isArray(students) ? students : [];
+    data: attendance,
+    loading: attendanceLoading,
+    refetch: refetchAttendance,
+  } = useAttendance();
+  const { execute, loading: operationLoading } = useApiOperations();
 
   // Filtrar rotas ativas
-  const activeRoutes = routesArray.filter(
-    (route: Route) => route.status === "Ativo" || route.status === "Agendada",
-  );
+  const activeRoutes =
+    routes?.filter(
+      (route: Route) => route.status === "Ativo" || route.status === "Agendada",
+    ) || [];
 
   const selectedRouteData = activeRoutes.find(
     (r: Route) => r.id?.toString() === selectedRoute,
   );
 
   // Filtrar alunos da rota selecionada (simulado - pode ser expandido com relação rota-aluno)
-  const routeStudents = studentsArray.slice(0, 10); // Limitando para exemplo
+  const routeStudents = students?.slice(0, 10) || []; // Limitando para exemplo
 
   const handlePresenceChange = (
     studentId: number,
@@ -94,11 +91,7 @@ export default function PresencasPage() {
 
   const handleSubmitAttendance = async () => {
     if (!selectedRoute) {
-      notifications.show({
-        title: "Erro",
-        message: "Selecione uma rota primeiro",
-        color: "red",
-      });
+      alert("Selecione uma rota primeiro");
       return;
     }
 
@@ -108,37 +101,33 @@ export default function PresencasPage() {
         const status = attendanceData[student.id!] || "absent";
         const observation = observations[student.id!] || "";
 
-        return markAttendanceMutation.mutateAsync({
-          studentId: student.id!,
-          routeId: parseInt(selectedRoute),
-          status: status === "present" ? "Presente" : "Ausente",
-          date: new Date().toISOString().split("T")[0],
-          observation,
-        });
+        return execute(() =>
+          apiOperations.attendance.create({
+            studentId: student.id!,
+            routeId: parseInt(selectedRoute),
+            status: status === "present" ? "Presente" : "Ausente",
+            date: new Date().toISOString().split("T")[0],
+            observation,
+          }),
+        );
       });
 
       await Promise.all(attendancePromises);
 
-      notifications.show({
-        title: "Sucesso",
-        message: "Presenças confirmadas com sucesso!",
-        color: "green",
-      });
+      alert("Presenças confirmadas com sucesso!");
+      refetchAttendance();
 
       // Limpar dados
       setAttendanceData({});
       setObservations({});
-    } catch {
-      notifications.show({
-        title: "Erro",
-        message: "Erro ao confirmar presenças",
-        color: "red",
-      });
+    } catch (error) {
+      alert("Erro ao confirmar presenças");
     }
   };
 
   const handleRefresh = () => {
-    window.location.reload();
+    refetchRoutes();
+    refetchAttendance();
   };
 
   const presentCount = Object.values(attendanceData).filter(
@@ -171,43 +160,14 @@ export default function PresencasPage() {
     }
   };
 
-  const isOperationLoading = markAttendanceMutation.isPending;
-
-  if (routesLoading || studentsLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Loader size="lg" />
-          <Text mt="md">Carregando dados...</Text>
-        </div>
-      </div>
-    );
-  }
-
-  if (routesError || studentsError) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Alert icon={<IconAlertCircle size="1rem" />} color="red" mb="md">
-            <Text size="sm">Erro ao carregar dados</Text>
-          </Alert>
-          <Button onClick={() => window.location.reload()}>
-            Tentar Novamente
-          </Button>
-        </div>
-      </div>
-    );
+  if (routesLoading || studentsLoading || attendanceLoading) {
+    return <div>Carregando dados...</div>;
   }
 
   return (
     <Stack gap="lg">
       <Group justify="space-between">
-        <div>
-          <Title order={1}>Confirmar Presença</Title>
-          <Text c="dimmed" mt="xs">
-            Marque a presença dos alunos em suas rotas
-          </Text>
-        </div>
+        <Title order={1}>Confirmar Presença</Title>
         <ActionIcon variant="light" size="lg" onClick={handleRefresh}>
           <IconRefresh size="1.2rem" />
         </ActionIcon>
@@ -347,7 +307,7 @@ export default function PresencasPage() {
               <Grid align="center">
                 <Grid.Col span={{ base: 12, md: 4 }}>
                   <div>
-                    <Text fw={500}>{student.name || "Nome não informado"}</Text>
+                    <Text fw={500}>{student.name}</Text>
                     <Group gap="xs" mt="xs">
                       <IconMapPin size="0.8rem" />
                       <Text size="sm" c="dimmed">
@@ -374,7 +334,6 @@ export default function PresencasPage() {
                       onClick={() =>
                         handlePresenceChange(student.id!, "present")
                       }
-                      disabled={isOperationLoading}
                     >
                       Presente
                     </Button>
@@ -390,7 +349,6 @@ export default function PresencasPage() {
                       onClick={() =>
                         handlePresenceChange(student.id!, "absent")
                       }
-                      disabled={isOperationLoading}
                     >
                       Ausente
                     </Button>
@@ -415,7 +373,6 @@ export default function PresencasPage() {
                     onChange={(e) =>
                       handleObservationChange(student.id!, e.target.value)
                     }
-                    disabled={isOperationLoading}
                   />
                 </Grid.Col>
               </Grid>
@@ -447,15 +404,14 @@ export default function PresencasPage() {
                   setAttendanceData({});
                   setObservations({});
                 }}
-                disabled={isOperationLoading}
               >
                 Limpar
               </Button>
               <Button
                 leftSection={<IconSend size="1rem" />}
                 onClick={handleSubmitAttendance}
-                disabled={pendingCount > 0 || isOperationLoading}
-                loading={isOperationLoading}
+                disabled={pendingCount > 0 || operationLoading}
+                loading={operationLoading}
               >
                 Confirmar Presenças
               </Button>

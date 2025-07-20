@@ -4,8 +4,11 @@ import {
   mantineHtmlProps,
   MantineProvider,
 } from "@mantine/core";
+import { Notifications } from "@mantine/notifications";
+import { QueryProvider } from "@/providers/QueryProvider";
 import theme from "./theme";
 import "./globals.css";
+import "@mantine/notifications/styles.css";
 
 export const metadata: Metadata = {
   title: "Galdino - Sistema de Transporte",
@@ -23,7 +26,12 @@ export default function RootLayout({
         <ColorSchemeScript />
       </head>
       <body className="antialiased">
-        <MantineProvider theme={theme}>{children}</MantineProvider>
+        <MantineProvider theme={theme}>
+          <QueryProvider>
+            <Notifications />
+            {children}
+          </QueryProvider>
+        </MantineProvider>
       </body>
     </html>
   );

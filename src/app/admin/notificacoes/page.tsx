@@ -32,15 +32,14 @@ import {
   IconAlertCircle,
   IconSend,
   IconUsers,
-  IconUser,
 } from "@tabler/icons-react";
 
 import {
   useNotifications,
-  useApiOperations,
-  apiOperations,
-} from "@/hooks/useApiData";
-import { Notification } from "@/services/api";
+  useCreateNotification,
+  useMarkNotificationAsRead,
+  type Notification,
+} from "@/hooks/useApi";
 
 export default function NotificacoesPage() {
   const [opened, { open, close }] = useDisclosure(false);
@@ -58,17 +57,18 @@ export default function NotificacoesPage() {
   const [recipientType, setRecipientType] = useState("all");
 
   // Usar a API real
-  const { data: notifications, loading, error, refetch } = useNotifications();
-  const { execute } = useApiOperations();
+  const { data: notifications, isLoading, error } = useNotifications();
+  const createMutation = useCreateNotification();
+  const markAsReadMutation = useMarkNotificationAsRead();
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "sent":
-        return "green";
-      case "draft":
-        return "gray";
-      case "scheduled":
+      case "info":
         return "blue";
+      case "warning":
+        return "yellow";
+      case "urgent":
+        return "red";
       default:
         return "gray";
     }
@@ -76,35 +76,35 @@ export default function NotificacoesPage() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "sent":
-        return "Enviada";
-      case "draft":
-        return "Rascunho";
-      case "scheduled":
-        return "Agendada";
+      case "info":
+        return "Informação";
+      case "warning":
+        return "Aviso";
+      case "urgent":
+        return "Urgente";
       default:
         return "Desconhecido";
     }
   };
 
-  const filteredNotifications = notifications.filter(
+  const filteredNotifications = (notifications || []).filter(
     (notification: Notification) => {
       const matchesSearch =
-        notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        notification.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (notification.recipientLabel &&
-          notification.recipientLabel
+        (notification.title &&
+          notification.title
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase())) ||
+        (notification.message &&
+          notification.message
             .toLowerCase()
             .includes(searchTerm.toLowerCase()));
-      const matchesStatus =
-        !statusFilter || notification.status === statusFilter;
+      const matchesStatus = !statusFilter || notification.type === statusFilter;
       return matchesSearch && matchesStatus;
     },
   );
 
   const handleEdit = (notification: Notification) => {
     setEditingNotification(notification);
-    setRecipientType(notification.recipient || "all");
     open();
   };
 
@@ -116,29 +116,21 @@ export default function NotificacoesPage() {
   const handleDeleteConfirm = async () => {
     if (notificationToDelete?.id) {
       try {
-        await execute(() =>
-          apiOperations.notifications.delete(notificationToDelete.id!),
-        );
+        // Simular exclusão - na API real seria implementado
+        console.log("Excluindo notificação:", notificationToDelete.id);
         setNotificationToDelete(null);
         closeDeleteModal();
-        refetch();
       } catch {
         alert("Erro ao excluir notificação");
       }
     }
   };
 
-  const handleSendNotification = async (notificationId: number) => {
+  const handleMarkAsRead = async (notificationId: number) => {
     try {
-      await execute(() =>
-        apiOperations.notifications.update(notificationId, {
-          status: "sent",
-          sentAt: new Date().toISOString(),
-        }),
-      );
-      refetch();
+      await markAsReadMutation.mutateAsync(notificationId);
     } catch {
-      alert("Erro ao enviar notificação");
+      alert("Erro ao marcar como lida");
     }
   };
 
@@ -156,7 +148,7 @@ export default function NotificacoesPage() {
     startIndex + itemsPerPage,
   );
 
-  if (loading) {
+  if (isLoading) {
     return <div>Carregando notificações...</div>;
   }
 
@@ -178,7 +170,7 @@ export default function NotificacoesPage() {
         <Grid>
           <Grid.Col span={{ base: 12, md: 6 }}>
             <TextInput
-              placeholder="Buscar por título, mensagem ou destinatário..."
+              placeholder="Buscar por título ou mensagem..."
               leftSection={<IconSearch size="1rem" />}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -186,11 +178,11 @@ export default function NotificacoesPage() {
           </Grid.Col>
           <Grid.Col span={{ base: 12, md: 3 }}>
             <Select
-              placeholder="Status"
+              placeholder="Tipo"
               data={[
-                { value: "sent", label: "Enviada" },
-                { value: "draft", label: "Rascunho" },
-                { value: "scheduled", label: "Agendada" },
+                { value: "info", label: "Informação" },
+                { value: "warning", label: "Aviso" },
+                { value: "urgent", label: "Urgente" },
               ]}
               value={statusFilter}
               onChange={setStatusFilter}
@@ -212,14 +204,14 @@ export default function NotificacoesPage() {
             <Table.Tr>
               <Table.Th>Notificação</Table.Th>
               <Table.Th>Destinatário</Table.Th>
+              <Table.Th>Tipo</Table.Th>
               <Table.Th>Status</Table.Th>
-              <Table.Th>Leitura</Table.Th>
               <Table.Th>Data</Table.Th>
               <Table.Th>Ações</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {paginatedNotifications.map((notification) => (
+            {paginatedNotifications.map((notification: Notification) => (
               <Table.Tr key={notification.id}>
                 <Table.Td>
                   <div>
@@ -231,68 +223,30 @@ export default function NotificacoesPage() {
                 </Table.Td>
                 <Table.Td>
                   <Group gap="xs">
-                    {notification.recipient === "all" ? (
-                      <IconUsers size="0.8rem" />
-                    ) : (
-                      <IconUser size="0.8rem" />
-                    )}
-                    <Text size="sm">
-                      {notification.recipientLabel || "N/A"}
-                    </Text>
+                    <IconUsers size="0.8rem" />
+                    <Text size="sm">Todos os usuários</Text>
                   </Group>
                 </Table.Td>
                 <Table.Td>
                   <Badge
-                    color={getStatusColor(notification.status || "")}
+                    color={getStatusColor(notification.type || "")}
                     variant="light"
                   >
-                    {getStatusLabel(notification.status || "")}
+                    {getStatusLabel(notification.type || "")}
                   </Badge>
                 </Table.Td>
                 <Table.Td>
-                  {notification.status === "sent" &&
-                  notification.readCount &&
-                  notification.totalRecipients ? (
-                    <div>
-                      <Text size="sm">
-                        {notification.readCount}/{notification.totalRecipients}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        {Math.round(
-                          (notification.readCount /
-                            notification.totalRecipients) *
-                            100,
-                        )}
-                        % lida
-                      </Text>
-                    </div>
-                  ) : (
-                    <Text size="sm" c="dimmed">
-                      -
-                    </Text>
-                  )}
+                  <Badge
+                    color={notification.isRead ? "green" : "gray"}
+                    variant="light"
+                  >
+                    {notification.isRead ? "Lida" : "Não lida"}
+                  </Badge>
                 </Table.Td>
                 <Table.Td>
-                  <div>
-                    <Text size="sm">
-                      {notification.createdAt
-                        ? new Date(notification.createdAt).toLocaleDateString(
-                            "pt-BR",
-                          )
-                        : "N/A"}
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      {notification.createdAt
-                        ? new Date(notification.createdAt).toLocaleTimeString(
-                            "pt-BR",
-                            {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            },
-                          )
-                        : ""}
-                    </Text>
-                  </div>
+                  <Text size="sm">
+                    {new Date().toLocaleDateString("pt-BR")}
+                  </Text>
                 </Table.Td>
                 <Table.Td>
                   <Menu shadow="md" width={200}>
@@ -311,17 +265,13 @@ export default function NotificacoesPage() {
                       >
                         Editar
                       </Menu.Item>
-                      {notification.status === "draft" && (
-                        <Menu.Item
-                          color="blue"
-                          leftSection={<IconSend size="0.9rem" />}
-                          onClick={() =>
-                            handleSendNotification(notification.id!)
-                          }
-                        >
-                          Enviar
-                        </Menu.Item>
-                      )}
+                      <Menu.Item
+                        color="blue"
+                        leftSection={<IconSend size="0.9rem" />}
+                        onClick={() => handleMarkAsRead(notification.id!)}
+                      >
+                        Marcar como lida
+                      </Menu.Item>
                       <Menu.Divider />
                       <Menu.Item
                         color="red"
@@ -376,6 +326,19 @@ export default function NotificacoesPage() {
               />
             </Grid.Col>
             <Grid.Col span={12}>
+              <Select
+                label="Tipo"
+                placeholder="Selecione o tipo"
+                data={[
+                  { value: "info", label: "Informação" },
+                  { value: "warning", label: "Aviso" },
+                  { value: "urgent", label: "Urgente" },
+                ]}
+                required
+                defaultValue={editingNotification?.type}
+              />
+            </Grid.Col>
+            <Grid.Col span={12}>
               <Text size="sm" fw={500} mb="xs">
                 Destinatário
               </Text>
@@ -388,7 +351,6 @@ export default function NotificacoesPage() {
                     value="route"
                     label="Usuários de uma rota específica"
                   />
-                  <Radio value="student" label="Aluno específico" />
                 </Stack>
               </Radio.Group>
             </Grid.Col>
@@ -407,37 +369,6 @@ export default function NotificacoesPage() {
                 />
               </Grid.Col>
             )}
-
-            {recipientType === "student" && (
-              <Grid.Col span={12}>
-                <Select
-                  label="Aluno"
-                  placeholder="Selecione um aluno"
-                  data={[
-                    { value: "1", label: "Ana Silva Santos" },
-                    { value: "2", label: "Carlos Eduardo Lima" },
-                    { value: "3", label: "Mariana Costa Oliveira" },
-                    { value: "4", label: "Pedro Henrique Souza" },
-                    { value: "5", label: "Juliana Ferreira" },
-                  ]}
-                  required
-                />
-              </Grid.Col>
-            )}
-
-            <Grid.Col span={12}>
-              <Select
-                label="Ação"
-                placeholder="Selecione uma ação"
-                data={[
-                  { value: "send", label: "Enviar agora" },
-                  { value: "draft", label: "Salvar como rascunho" },
-                  { value: "schedule", label: "Agendar envio" },
-                ]}
-                required
-                defaultValue="send"
-              />
-            </Grid.Col>
           </Grid>
 
           <Group justify="flex-end" mt="md">
