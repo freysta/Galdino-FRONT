@@ -58,7 +58,6 @@ export default function NotificacoesPage() {
 
   // Usar a API real
   const { data: notifications, isLoading, error } = useNotifications();
-  const createMutation = useCreateNotification();
   const markAsReadMutation = useMarkNotificationAsRead();
 
   const getStatusColor = (status: string) => {

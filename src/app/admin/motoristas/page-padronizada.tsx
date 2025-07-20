@@ -28,72 +28,77 @@ import {
   IconEdit,
   IconTrash,
   IconDots,
+  IconCar,
   IconUsers,
-  IconClock,
+  IconUserCheck,
+  IconUserX,
   IconAlertCircle,
 } from "@tabler/icons-react";
 
 import {
-  useStudents,
-  useCreateStudent,
-  useUpdateStudent,
-  useDeleteStudent,
-  useInstitutions,
-  type Student,
-  type Institution,
+  useDrivers,
+  useCreateDriver,
+  useUpdateDriver,
+  useDeleteDriver,
+  type Driver,
 } from "@/hooks/useApi";
 
-export default function AlunosPage() {
+export default function MotoristasPage() {
   const [opened, { open, close }] = useDisclosure(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [shiftFilter, setShiftFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
 
-  const { data: students = [], isLoading, error } = useStudents();
-  const { data: institutions = [], isLoading: institutionsLoading } =
-    useInstitutions();
-  const createMutation = useCreateStudent();
-  const updateMutation = useUpdateStudent();
-  const deleteMutation = useDeleteStudent();
+  const { data: drivers = [], isLoading, error } = useDrivers();
+  const createMutation = useCreateDriver();
+  const updateMutation = useUpdateDriver();
+  const deleteMutation = useDeleteDriver();
 
-  const studentsArray = Array.isArray(students) ? students : [];
-  const institutionsArray = Array.isArray(institutions) ? institutions : [];
+  const driversArray = Array.isArray(drivers) ? drivers : [];
 
-  // Preparar dados para o select de instituições
-  const institutionsSelectData = institutionsArray.map(
-    (institution: Institution) => ({
-      value: institution.id?.toString() || "",
-      label: institution.nome || `Instituição #${institution.id}`,
-    }),
-  );
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "ativo":
+        return "green";
+      case "inativo":
+        return "red";
+      case "suspenso":
+        return "orange";
+      default:
+        return "gray";
+    }
+  };
 
-  const filteredStudents = studentsArray.filter((student: Student) => {
+  const filteredDrivers = driversArray.filter((driver: Driver) => {
     const matchesSearch =
-      student.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesShift = !shiftFilter || student.shift === shiftFilter;
-    return matchesSearch && matchesShift;
+      driver.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      driver.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (driver.cnh && driver.cnh.includes(searchTerm));
+    const matchesStatus =
+      !statusFilter ||
+      driver.status?.toLowerCase() === statusFilter.toLowerCase();
+    return matchesSearch && matchesStatus;
   });
 
-  const handleEdit = (student: Student) => {
-    setEditingStudent(student);
+  const handleEdit = (driver: Driver) => {
+    setEditingDriver(driver);
     open();
   };
 
   const handleDelete = async (id: number) => {
-    if (confirm("Tem certeza que deseja excluir este aluno?")) {
+    if (confirm("Tem certeza que deseja excluir este motorista?")) {
       try {
         await deleteMutation.mutateAsync(id);
         notifications.show({
           title: "Sucesso",
-          message: "Aluno excluído com sucesso!",
+          message: "Motorista excluído com sucesso!",
           color: "green",
         });
       } catch {
         notifications.show({
           title: "Erro",
-          message: "Erro ao excluir aluno",
+          message: "Erro ao excluir motorista",
           color: "red",
         });
       }
@@ -102,53 +107,49 @@ export default function AlunosPage() {
 
   const handleSave = async (formData: FormData) => {
     try {
-      const studentData = {
+      const driverData = {
         name: formData.get("name") as string,
         email: formData.get("email") as string,
         phone: formData.get("phone") as string,
         cpf: formData.get("cpf") as string,
-        address: formData.get("address") as string,
-        city: formData.get("city") as string,
-        course: formData.get("course") as string,
-        shift: formData.get("shift") as
-          | "Manha"
-          | "Tarde"
-          | "Noite"
-          | "Integral",
-        institution: formData.get("institution") as string,
+        cnh: formData.get("cnh") as string,
+        vehicle: formData.get("vehicle") as string,
+        licenseExpiry: formData.get("licenseExpiry") as string,
+        birthDate: formData.get("birthDate") as string,
+        status: formData.get("status") as string,
       };
 
-      if (editingStudent?.id) {
+      if (editingDriver?.id) {
         await updateMutation.mutateAsync({
-          id: editingStudent.id,
-          data: studentData,
+          id: editingDriver.id,
+          data: driverData,
         });
         notifications.show({
           title: "Sucesso",
-          message: "Aluno atualizado com sucesso!",
+          message: "Motorista atualizado com sucesso!",
           color: "green",
         });
       } else {
-        await createMutation.mutateAsync(studentData);
+        await createMutation.mutateAsync(driverData);
         notifications.show({
           title: "Sucesso",
-          message: "Aluno criado com sucesso!",
+          message: "Motorista criado com sucesso!",
           color: "green",
         });
       }
       close();
-      setEditingStudent(null);
+      setEditingDriver(null);
     } catch {
       notifications.show({
         title: "Erro",
-        message: "Erro ao salvar aluno",
+        message: "Erro ao salvar motorista",
         color: "red",
       });
     }
   };
 
   const handleAddNew = () => {
-    setEditingStudent(null);
+    setEditingDriver(null);
     open();
   };
 
@@ -158,22 +159,23 @@ export default function AlunosPage() {
     deleteMutation.isPending;
 
   const itemsPerPage = 10;
-  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredDrivers.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedStudents = filteredStudents.slice(
+  const paginatedDrivers = filteredDrivers.slice(
     startIndex,
     startIndex + itemsPerPage,
   );
 
-  const totalStudents = studentsArray.length;
-  const morningStudents = studentsArray.filter(
-    (s: Student) => s.shift === "Manha",
+  // Estatísticas
+  const totalDrivers = driversArray.length;
+  const activeDrivers = driversArray.filter(
+    (d: Driver) => d.status?.toLowerCase() === "ativo",
   ).length;
-  const afternoonStudents = studentsArray.filter(
-    (s: Student) => s.shift === "Tarde",
+  const inactiveDrivers = driversArray.filter(
+    (d: Driver) => d.status?.toLowerCase() === "inativo",
   ).length;
-  const nightStudents = studentsArray.filter(
-    (s: Student) => s.shift === "Noite",
+  const suspendedDrivers = driversArray.filter(
+    (d: Driver) => d.status?.toLowerCase() === "suspenso",
   ).length;
 
   if (isLoading) {
@@ -181,7 +183,7 @@ export default function AlunosPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <Loader size="lg" />
-          <Text mt="md">Carregando alunos...</Text>
+          <Text mt="md">Carregando motoristas...</Text>
         </div>
       </div>
     );
@@ -192,7 +194,7 @@ export default function AlunosPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <Alert icon={<IconAlertCircle size="1rem" />} color="red" mb="md">
-            <Text size="sm">Erro ao carregar alunos</Text>
+            <Text size="sm">Erro ao carregar motoristas</Text>
           </Alert>
           <Button onClick={() => window.location.reload()}>
             Tentar Novamente
@@ -206,9 +208,9 @@ export default function AlunosPage() {
     <Stack gap="lg">
       <Group justify="space-between">
         <div>
-          <Title order={1}>Gerenciar Alunos</Title>
+          <Title order={1}>Gerenciar Motoristas</Title>
           <Text c="dimmed" mt="xs">
-            Cadastro e controle dos alunos
+            Cadastro e controle dos motoristas
           </Text>
         </div>
         <Button
@@ -216,20 +218,21 @@ export default function AlunosPage() {
           onClick={handleAddNew}
           disabled={isOperationLoading}
         >
-          Novo Aluno
+          Novo Motorista
         </Button>
       </Group>
 
+      {/* Estatísticas */}
       <Grid>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Card withBorder padding="md">
             <Group justify="space-between">
               <div>
                 <Text size="sm" c="dimmed">
-                  Total de Alunos
+                  Total de Motoristas
                 </Text>
                 <Text size="xl" fw={700}>
-                  {totalStudents}
+                  {totalDrivers}
                 </Text>
               </div>
               <IconUsers size="2rem" color="blue" />
@@ -241,53 +244,54 @@ export default function AlunosPage() {
             <Group justify="space-between">
               <div>
                 <Text size="sm" c="dimmed">
-                  Manhã
+                  Ativos
+                </Text>
+                <Text size="xl" fw={700} c="green">
+                  {activeDrivers}
+                </Text>
+              </div>
+              <IconUserCheck size="2rem" color="green" />
+            </Group>
+          </Card>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Card withBorder padding="md">
+            <Group justify="space-between">
+              <div>
+                <Text size="sm" c="dimmed">
+                  Inativos
+                </Text>
+                <Text size="xl" fw={700} c="red">
+                  {inactiveDrivers}
+                </Text>
+              </div>
+              <IconUserX size="2rem" color="red" />
+            </Group>
+          </Card>
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Card withBorder padding="md">
+            <Group justify="space-between">
+              <div>
+                <Text size="sm" c="dimmed">
+                  Suspensos
                 </Text>
                 <Text size="xl" fw={700} c="orange">
-                  {morningStudents}
+                  {suspendedDrivers}
                 </Text>
               </div>
-              <IconClock size="2rem" color="orange" />
-            </Group>
-          </Card>
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-          <Card withBorder padding="md">
-            <Group justify="space-between">
-              <div>
-                <Text size="sm" c="dimmed">
-                  Tarde
-                </Text>
-                <Text size="xl" fw={700} c="blue">
-                  {afternoonStudents}
-                </Text>
-              </div>
-              <IconClock size="2rem" color="blue" />
-            </Group>
-          </Card>
-        </Grid.Col>
-        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-          <Card withBorder padding="md">
-            <Group justify="space-between">
-              <div>
-                <Text size="sm" c="dimmed">
-                  Noite
-                </Text>
-                <Text size="xl" fw={700} c="violet">
-                  {nightStudents}
-                </Text>
-              </div>
-              <IconClock size="2rem" color="violet" />
+              <IconCar size="2rem" color="orange" />
             </Group>
           </Card>
         </Grid.Col>
       </Grid>
 
+      {/* Filtros */}
       <Card withBorder padding="md">
         <Grid>
           <Grid.Col span={{ base: 12, md: 6 }}>
             <TextInput
-              placeholder="Buscar por nome ou email..."
+              placeholder="Buscar por nome, email ou CNH..."
               leftSection={<IconSearch size="1rem" />}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -295,85 +299,88 @@ export default function AlunosPage() {
           </Grid.Col>
           <Grid.Col span={{ base: 12, md: 4 }}>
             <Select
-              placeholder="Filtrar por turno"
+              placeholder="Filtrar por status"
               data={[
-                { value: "Manha", label: "Manhã" },
-                { value: "Tarde", label: "Tarde" },
-                { value: "Noite", label: "Noite" },
-                { value: "Integral", label: "Integral" },
+                { value: "ativo", label: "Ativo" },
+                { value: "inativo", label: "Inativo" },
+                { value: "suspenso", label: "Suspenso" },
               ]}
-              value={shiftFilter}
-              onChange={setShiftFilter}
+              value={statusFilter}
+              onChange={setStatusFilter}
               clearable
             />
           </Grid.Col>
           <Grid.Col span={{ base: 12, md: 2 }}>
             <Text size="sm" c="dimmed">
-              {filteredStudents.length} registro(s)
+              {filteredDrivers.length} registro(s)
             </Text>
           </Grid.Col>
         </Grid>
       </Card>
 
+      {/* Tabela de motoristas */}
       <Card withBorder padding="md">
         <div className="overflow-x-auto">
           <Table striped highlightOnHover>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Aluno</Table.Th>
-                <Table.Th>Email</Table.Th>
-                <Table.Th>Telefone</Table.Th>
-                <Table.Th>Turno</Table.Th>
-                <Table.Th>Curso</Table.Th>
-                <Table.Th>Instituição</Table.Th>
+                <Table.Th>Motorista</Table.Th>
+                <Table.Th>Contato</Table.Th>
+                <Table.Th>CNH</Table.Th>
+                <Table.Th>Veículo</Table.Th>
+                <Table.Th>Status</Table.Th>
                 <Table.Th>Ações</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {paginatedStudents.length > 0 ? (
-                paginatedStudents.map((student: Student) => (
-                  <Table.Tr key={student.id}>
+              {paginatedDrivers.length > 0 ? (
+                paginatedDrivers.map((driver: Driver) => (
+                  <Table.Tr key={driver.id}>
                     <Table.Td>
                       <div>
                         <Text fw={500}>
-                          {student.name || "Nome não informado"}
+                          {driver.name || "Nome não informado"}
                         </Text>
                         <Text size="xs" c="dimmed">
-                          ID: {student.id || "N/A"}
+                          CPF: {driver.cpf || "Não informado"}
                         </Text>
                       </div>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="sm">
-                        {student.email || "Email não informado"}
-                      </Text>
+                      <div>
+                        <Text size="sm">
+                          {driver.email || "Email não informado"}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          {driver.phone || "Telefone não informado"}
+                        </Text>
+                      </div>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="sm">{student.phone || "Não informado"}</Text>
+                      <div>
+                        <Text size="sm" ff="monospace">
+                          {driver.cnh || "Não informado"}
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                          Venc:{" "}
+                          {driver.licenseExpiry
+                            ? new Date(driver.licenseExpiry).toLocaleDateString(
+                                "pt-BR",
+                              )
+                            : "N/A"}
+                        </Text>
+                      </div>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm">{driver.vehicle || "Não atribuído"}</Text>
                     </Table.Td>
                     <Table.Td>
                       <Badge
-                        color={
-                          student.shift === "Manha"
-                            ? "orange"
-                            : student.shift === "Tarde"
-                              ? "blue"
-                              : student.shift === "Noite"
-                                ? "violet"
-                                : "gray"
-                        }
+                        color={getStatusColor(driver.status || "")}
                         variant="light"
                       >
-                        {student.shift || "Não informado"}
+                        {driver.status || "Desconhecido"}
                       </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="sm">{student.course || "Não informado"}</Text>
-                    </Table.Td>
-                    <Table.Td>
-                      <Text size="sm">
-                        {student.institution || "Não informado"}
-                      </Text>
                     </Table.Td>
                     <Table.Td>
                       <Menu shadow="md" width={200}>
@@ -385,14 +392,14 @@ export default function AlunosPage() {
                         <Menu.Dropdown>
                           <Menu.Item
                             leftSection={<IconEdit size="0.9rem" />}
-                            onClick={() => handleEdit(student)}
+                            onClick={() => handleEdit(driver)}
                           >
                             Editar
                           </Menu.Item>
                           <Menu.Item
                             color="red"
                             leftSection={<IconTrash size="0.9rem" />}
-                            onClick={() => handleDelete(student.id!)}
+                            onClick={() => handleDelete(driver.id!)}
                           >
                             Excluir
                           </Menu.Item>
@@ -403,11 +410,11 @@ export default function AlunosPage() {
                 ))
               ) : (
                 <Table.Tr>
-                  <Table.Td colSpan={7} style={{ textAlign: "center" }}>
+                  <Table.Td colSpan={6} style={{ textAlign: "center" }}>
                     <Text c="dimmed">
-                      {searchTerm || shiftFilter
-                        ? "Nenhum aluno encontrado"
-                        : "Nenhum aluno cadastrado"}
+                      {searchTerm || statusFilter
+                        ? "Nenhum motorista encontrado"
+                        : "Nenhum motorista cadastrado"}
                     </Text>
                   </Table.Td>
                 </Table.Tr>
@@ -427,10 +434,11 @@ export default function AlunosPage() {
         )}
       </Card>
 
+      {/* Modal de adicionar/editar motorista */}
       <Modal
         opened={opened}
         onClose={close}
-        title={editingStudent ? "Editar Aluno" : "Novo Aluno"}
+        title={editingDriver ? "Editar Motorista" : "Novo Motorista"}
         size="lg"
       >
         <form
@@ -448,7 +456,7 @@ export default function AlunosPage() {
                   placeholder="Digite o nome completo"
                   name="name"
                   required
-                  defaultValue={editingStudent?.name}
+                  defaultValue={editingDriver?.name}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
@@ -458,7 +466,7 @@ export default function AlunosPage() {
                   name="email"
                   type="email"
                   required
-                  defaultValue={editingStudent?.email}
+                  defaultValue={editingDriver?.email}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
@@ -466,7 +474,7 @@ export default function AlunosPage() {
                   label="Telefone"
                   placeholder="(00) 00000-0000"
                   name="phone"
-                  defaultValue={editingStudent?.phone}
+                  defaultValue={editingDriver?.phone}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
@@ -474,58 +482,55 @@ export default function AlunosPage() {
                   label="CPF"
                   placeholder="000.000.000-00"
                   name="cpf"
-                  defaultValue={editingStudent?.cpf}
+                  defaultValue={editingDriver?.cpf}
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="CNH"
+                  placeholder="00000000000"
+                  name="cnh"
+                  defaultValue={editingDriver?.cnh}
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="Data de Nascimento"
+                  placeholder="YYYY-MM-DD"
+                  name="birthDate"
+                  type="date"
+                  defaultValue={editingDriver?.birthDate}
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="Vencimento da CNH"
+                  placeholder="YYYY-MM-DD"
+                  name="licenseExpiry"
+                  type="date"
+                  defaultValue={editingDriver?.licenseExpiry}
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <TextInput
+                  label="Veículo"
+                  placeholder="Ex: Ônibus 001"
+                  name="vehicle"
+                  defaultValue={editingDriver?.vehicle}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
                 <Select
-                  label="Turno"
-                  placeholder="Selecione o turno"
-                  name="shift"
+                  label="Status"
+                  placeholder="Selecione o status"
+                  name="status"
                   data={[
-                    { value: "Manha", label: "Manhã" },
-                    { value: "Tarde", label: "Tarde" },
-                    { value: "Noite", label: "Noite" },
-                    { value: "Integral", label: "Integral" },
+                    { value: "ativo", label: "Ativo" },
+                    { value: "inativo", label: "Inativo" },
+                    { value: "suspenso", label: "Suspenso" },
                   ]}
                   required
-                  defaultValue={editingStudent?.shift}
-                />
-              </Grid.Col>
-              <Grid.Col span={12}>
-                <TextInput
-                  label="Endereço"
-                  placeholder="Rua, número, bairro"
-                  name="address"
-                  defaultValue={editingStudent?.address}
-                />
-              </Grid.Col>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <TextInput
-                  label="Cidade"
-                  placeholder="Nome da cidade"
-                  name="city"
-                  defaultValue={editingStudent?.city}
-                />
-              </Grid.Col>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <TextInput
-                  label="Curso"
-                  placeholder="Nome do curso"
-                  name="course"
-                  defaultValue={editingStudent?.course}
-                />
-              </Grid.Col>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <Select
-                  label="Instituição"
-                  placeholder="Selecione uma instituição"
-                  name="institution"
-                  data={institutionsSelectData}
-                  required
-                  defaultValue={editingStudent?.institution}
-                  searchable
-                  disabled={institutionsLoading}
+                  defaultValue={editingDriver?.status}
                 />
               </Grid.Col>
             </Grid>
@@ -535,7 +540,7 @@ export default function AlunosPage() {
                 Cancelar
               </Button>
               <Button type="submit" loading={isOperationLoading}>
-                {editingStudent ? "Salvar" : "Criar"}
+                {editingDriver ? "Salvar" : "Criar"}
               </Button>
             </Group>
           </Stack>

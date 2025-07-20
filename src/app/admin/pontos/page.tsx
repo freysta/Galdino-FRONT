@@ -109,8 +109,8 @@ export default function PontosPage() {
         point.city.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (point.neighborhood &&
         point.neighborhood.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (point.street &&
-        point.street.toLowerCase().includes(searchTerm.toLowerCase()));
+      (point.address &&
+        point.address.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = !statusFilter || point.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -153,25 +153,14 @@ export default function PontosPage() {
 
   const handleSave = async (formData: FormData) => {
     try {
-      const routesString = formData.get("routes") as string;
-      const routes = routesString
-        ? routesString
-            .split(",")
-            .map((r) => r.trim())
-            .filter((r) => r)
-        : [];
-
+      // Estrutura correta para a API BoardingPoint
       const pointData = {
         name: formData.get("name") as string,
         address: formData.get("address") as string,
         city: formData.get("city") as string,
-        street: formData.get("street") as string,
         neighborhood: formData.get("neighborhood") as string,
-        reference: formData.get("reference") as string,
-        capacity: parseInt(formData.get("capacity") as string) || 0,
         status: formData.get("status") as string,
-        type: "Ponto de Embarque",
-        routes,
+        routes: 1, // Número de rotas (conforme interface da API)
       };
 
       if (editingPoint?.id) {
@@ -194,10 +183,12 @@ export default function PontosPage() {
       }
       close();
       setEditingPoint(null);
-    } catch {
+    } catch (error) {
+      console.error("Erro ao salvar ponto de embarque:", error);
       notifications.show({
         title: "Erro",
-        message: "Erro ao salvar ponto de embarque",
+        message:
+          "Erro ao salvar ponto de embarque. Verifique os dados e tente novamente.",
         color: "red",
       });
     }
@@ -387,11 +378,9 @@ export default function PontosPage() {
                         <Text fw={500}>
                           {point.name || "Nome não informado"}
                         </Text>
-                        {point.reference && (
-                          <Text size="xs" c="dimmed" mt="xs">
-                            {point.reference}
-                          </Text>
-                        )}
+                        <Text size="xs" c="dimmed" mt="xs">
+                          ID: {point.id || "N/A"}
+                        </Text>
                       </div>
                     </Table.Td>
                     <Table.Td>
@@ -402,10 +391,10 @@ export default function PontosPage() {
                             <Text size="sm">{point.city}</Text>
                           </Group>
                         )}
-                        {point.street && (
+                        {point.address && (
                           <Group gap="xs">
                             <IconRoad size="0.8rem" />
-                            <Text size="sm">{point.street}</Text>
+                            <Text size="sm">{point.address}</Text>
                           </Group>
                         )}
                         {point.neighborhood && (
@@ -416,27 +405,14 @@ export default function PontosPage() {
                       </Stack>
                     </Table.Td>
                     <Table.Td>
-                      <Stack gap="xs">
-                        {point.routes && point.routes.length > 0 ? (
-                          point.routes.map((route: string, index: number) => (
-                            <Badge
-                              key={index}
-                              variant="light"
-                              color="blue"
-                              size="sm"
-                            >
-                              {route}
-                            </Badge>
-                          ))
-                        ) : (
-                          <Text size="sm" c="dimmed">
-                            Nenhuma rota
-                          </Text>
-                        )}
-                      </Stack>
+                      <Text size="sm" c="dimmed">
+                        {point.routes || 0} rota(s)
+                      </Text>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="sm">{point.capacity || 0} pessoas</Text>
+                      <Text size="sm" c="dimmed">
+                        N/A
+                      </Text>
                     </Table.Td>
                     <Table.Td>
                       <Badge
@@ -553,27 +529,9 @@ export default function PontosPage() {
                 <TextInput
                   label="Endereço"
                   placeholder="Ex: Rua do Terminal, 123"
-                  name="street"
+                  name="address"
                   required
-                  defaultValue={editingPoint?.street}
-                />
-              </Grid.Col>
-              <Grid.Col span={12}>
-                <Textarea
-                  label="Ponto de referência"
-                  placeholder="Ex: Próximo ao Shopping Center"
-                  name="reference"
-                  defaultValue={editingPoint?.reference}
-                />
-              </Grid.Col>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <TextInput
-                  label="Capacidade"
-                  placeholder="Ex: 50"
-                  name="capacity"
-                  type="number"
-                  required
-                  defaultValue={editingPoint?.capacity?.toString()}
+                  defaultValue={editingPoint?.address}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
@@ -595,7 +553,11 @@ export default function PontosPage() {
                   label="Rotas que utilizam este ponto"
                   placeholder="Digite as rotas separadas por vírgula (Ex: Campus Norte, Campus Sul)"
                   name="routes"
-                  defaultValue={editingPoint?.routes?.join(", ")}
+                  defaultValue={
+                    Array.isArray(editingPoint?.routes)
+                      ? editingPoint.routes.join(", ")
+                      : editingPoint?.routes || ""
+                  }
                 />
               </Grid.Col>
             </Grid>

@@ -9,7 +9,7 @@ export default function AlunoLayout({
 }) {
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <ModernSidebar userType="aluno" />
+      <ModernSidebar />
       <main className="flex-1 p-8 bg-white">{children}</main>
     </div>
   );

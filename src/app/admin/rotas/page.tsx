@@ -183,20 +183,33 @@ export default function RotasPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.destination || !formData.origin || !formData.departureTime) {
+    if (!formData.destination || !formData.departureTime) {
       notifications.show({
         title: "Erro",
-        message: "Destino, origem e horário são obrigatórios",
+        message: "Destino e horário são obrigatórios",
         color: "red",
       });
       return;
     }
 
     try {
+      // Estrutura correta para a API
+      const routeData = {
+        date: formData.date || new Date().toISOString().split("T")[0],
+        destination: formData.destination as "Ida" | "Volta" | "Circular",
+        departureTime: formData.departureTime,
+        status: formData.status as
+          | "Planejada"
+          | "EmAndamento"
+          | "Concluida"
+          | "Cancelada",
+        driverId: 1, // ID padrão do motorista
+      };
+
       if (editingRoute?.id) {
         await updateRouteMutation.mutateAsync({
           id: editingRoute.id,
-          data: formData,
+          data: routeData,
         });
         notifications.show({
           title: "Sucesso",
@@ -204,7 +217,7 @@ export default function RotasPage() {
           color: "green",
         });
       } else {
-        await createRouteMutation.mutateAsync(formData as Route);
+        await createRouteMutation.mutateAsync(routeData);
         notifications.show({
           title: "Sucesso",
           message: "Rota criada com sucesso!",
@@ -213,10 +226,11 @@ export default function RotasPage() {
       }
       close();
       setEditingRoute(null);
-    } catch {
+    } catch (error) {
+      console.error("Erro ao salvar rota:", error);
       notifications.show({
         title: "Erro",
-        message: "Erro ao salvar rota",
+        message: "Erro ao salvar rota. Verifique os dados e tente novamente.",
         color: "red",
       });
     }

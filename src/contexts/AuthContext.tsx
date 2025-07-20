@@ -13,44 +13,50 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  switchProfile: (role: "admin" | "motorista" | "aluno") => void;
   isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>({
+const mockUsers = {
+  admin: {
     id: 1,
-    name: "Administrador",
+    name: "Administrador do Sistema",
     email: "admin@galdino.com",
     phone: "(11) 99999-9999",
-    role: "admin",
+    role: "admin" as const,
     createdAt: "2024-01-01",
-  });
+  },
+  motorista: {
+    id: 2,
+    name: "João Silva - Motorista",
+    email: "joao.motorista@galdino.com",
+    phone: "(11) 98888-8888",
+    role: "motorista" as const,
+    createdAt: "2024-01-01",
+  },
+  aluno: {
+    id: 3,
+    name: "Maria Santos - Aluna",
+    email: "maria.aluna@galdino.com",
+    phone: "(11) 97777-7777",
+    role: "aluno" as const,
+    createdAt: "2024-01-01",
+  },
+};
 
-  const login = async (email: string, password: string) => {
-    // Simular login
-    console.log("Login attempt with:", email, password);
-    setUser({
-      id: 1,
-      name: "Administrador",
-      email: email,
-      phone: "(11) 99999-9999",
-      role: "admin",
-      createdAt: "2024-01-01",
-    });
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(mockUsers.admin);
+
+  const switchProfile = (role: "admin" | "motorista" | "aluno") => {
+    setUser(mockUsers[role]);
   };
 
-  const logout = () => {
-    setUser(null);
-  };
-
-  const isAuthenticated = !!user;
+  const isAuthenticated = true;
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated }}>
+    <AuthContext.Provider value={{ user, switchProfile, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
   );

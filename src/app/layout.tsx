@@ -6,6 +6,7 @@ import {
 } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { QueryProvider } from "@/providers/QueryProvider";
+import { AuthProvider } from "@/contexts/AuthContext";
 import theme from "./theme";
 import "./globals.css";
 import "@mantine/notifications/styles.css";
@@ -27,10 +28,12 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         <MantineProvider theme={theme}>
-          <QueryProvider>
-            <Notifications />
-            {children}
-          </QueryProvider>
+          <AuthProvider>
+            <QueryProvider>
+              <Notifications />
+              {children}
+            </QueryProvider>
+          </AuthProvider>
         </MantineProvider>
       </body>
     </html>

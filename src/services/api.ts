@@ -10,32 +10,7 @@ const api = axios.create({
   },
 });
 
-// Interceptor para adicionar token em todas as requisições
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  },
-);
-
-// Interceptor para tratar erros
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      console.warn("Token expirado. Faça login novamente.");
-    }
-    return Promise.reject(error);
-  },
-);
+// Interceptors removidos - sistema sem autenticação para testes
 
 // ===== INTERFACES CORRIGIDAS PARA ALINHAR COM A API =====
 
@@ -95,22 +70,22 @@ export interface Payment {
   studentName?: string;
   amount: number;
   month: string;
+  monthLabel?: string; // Para exibição formatada no frontend
   year?: number;
-  status: "Pago" | "Pendente" | "Atrasado";
-  paymentMethod?: "PIX" | "Cartão" | "Dinheiro" | "Transferência";
+  status: "Pago" | "Pendente" | "Atrasado" | string | number;
+  paymentMethod?: "Dinheiro" | "CartaoCredito" | "Pix" | "Transferencia";
   paymentDate?: string;
   dueDate?: string;
 }
 
 export interface Route {
   id?: number;
-  name?: string;
   date: string;
   destination: "Ida" | "Volta" | "Circular";
   departureTime: string;
   status: "Planejada" | "EmAndamento" | "Concluida" | "Cancelada";
   driverId: number;
-  driverName?: string;
+  driverName?: string; // Campo calculado no frontend
   createdAt?: string;
 }
 
@@ -430,7 +405,7 @@ export const driverService = {
   },
 };
 
-// 💰 Pagamentos - CORRIGIDO
+// 💰 Pagamentos - CORRIGIDO PARA ALINHAR COM SCRIPT DE TESTE
 export const paymentService = {
   getAll: async (studentId?: number, status?: string, month?: string) => {
     const params = new URLSearchParams();
@@ -445,13 +420,13 @@ export const paymentService = {
     return response.data;
   },
   create: async (data: Payment) => {
+    // Estrutura exata esperada pelo script de teste
     const response = await api.post("/payments", {
       studentId: data.studentId,
       amount: data.amount,
       month: data.month,
-      status: data.status,
-      paymentMethod: data.paymentMethod,
-      paymentDate: data.paymentDate,
+      status: data.status || "Pendente",
+      paymentMethod: data.paymentMethod || "Dinheiro",
     });
     return response.data;
   },
@@ -460,7 +435,6 @@ export const paymentService = {
       amount: data.amount,
       status: data.status,
       paymentMethod: data.paymentMethod,
-      paymentDate: data.paymentDate,
     });
     return response.data;
   },

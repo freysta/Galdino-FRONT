@@ -12,6 +12,7 @@ import {
   Badge,
   ActionIcon,
   Tooltip,
+  Select,
 } from "@mantine/core";
 import {
   IconDashboard,
@@ -24,15 +25,15 @@ import {
   IconUserCheck,
   IconHistory,
   IconUser,
-  IconSettings,
-  IconLogout,
+  IconSwitchHorizontal,
   IconChevronRight,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SidebarProps {
-  userType: "admin" | "motorista" | "aluno";
+  userType?: "admin" | "motorista" | "aluno";
 }
 
 interface MenuItem {
@@ -44,9 +45,14 @@ interface MenuItem {
   badge?: string;
 }
 
-export default function ModernSidebar({ userType }: SidebarProps) {
+export default function ModernSidebar({
+  userType: propUserType,
+}: SidebarProps) {
   const router = useRouter();
   const [active, setActive] = useState("dashboard");
+  const { user, switchProfile } = useAuth();
+
+  const userType = propUserType || user?.role || "admin";
 
   const adminMenuItems: MenuItem[] = [
     {
@@ -70,6 +76,20 @@ export default function ModernSidebar({ userType }: SidebarProps) {
       icon: IconCar,
       link: "/admin/motoristas",
       description: "Gerenciar condutores",
+    },
+    {
+      id: "instituicoes",
+      label: "Instituições",
+      icon: IconUsers,
+      link: "/admin/instituicoes",
+      description: "Gerenciar escolas",
+    },
+    {
+      id: "onibus",
+      label: "Ônibus",
+      icon: IconCar,
+      link: "/admin/onibus",
+      description: "Gerenciar frota",
     },
     {
       id: "rotas",
@@ -98,6 +118,13 @@ export default function ModernSidebar({ userType }: SidebarProps) {
       icon: IconBell,
       link: "/admin/notificacoes",
       description: "Comunicados",
+    },
+    {
+      id: "usuarios",
+      label: "Usuários",
+      icon: IconUser,
+      link: "/admin/usuarios",
+      description: "Gerenciar usuários",
     },
   ];
 
@@ -170,20 +197,43 @@ export default function ModernSidebar({ userType }: SidebarProps) {
   };
 
   const getUserInfo = () => {
-    switch (userType) {
-      case "admin":
-        return { name: "Admin Galdino", role: "Administrador", avatar: "AG" };
-      case "motorista":
-        return { name: "João Silva", role: "Motorista", avatar: "JS" };
-      case "aluno":
-        return { name: "Maria Santos", role: "Estudante", avatar: "MS" };
-      default:
-        return { name: "Usuário", role: "Visitante", avatar: "U" };
+    if (user) {
+      return {
+        name: user.name,
+        role:
+          user.role === "admin"
+            ? "Administrador"
+            : user.role === "motorista"
+              ? "Motorista"
+              : "Estudante",
+        avatar: user.name
+          .split(" ")
+          .map((n) => n[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2),
+      };
     }
+    return { name: "Usuário", role: "Visitante", avatar: "U" };
   };
 
-  const handleLogout = () => {
-    router.push("/login");
+  const handleProfileSwitch = (newRole: string | null) => {
+    if (!newRole) return;
+
+    switchProfile(newRole as "admin" | "motorista" | "aluno");
+
+    // Redirecionar para o dashboard apropriado
+    switch (newRole) {
+      case "admin":
+        router.push("/admin/dashboard");
+        break;
+      case "motorista":
+        router.push("/motorista/dashboard");
+        break;
+      case "aluno":
+        router.push("/aluno/rotas");
+        break;
+    }
   };
 
   const menuItems = getMenuItems();
@@ -353,36 +403,45 @@ export default function ModernSidebar({ userType }: SidebarProps) {
                 </Text>
               </div>
             </Group>
-            <Group gap="xs">
-              <Tooltip label="Configurações">
-                <ActionIcon
-                  variant="subtle"
-                  color="green"
-                  size="sm"
-                  style={{
-                    backgroundColor: "#f0fdf4",
-                    color: "#16a34a",
-                  }}
-                >
-                  <IconSettings size={16} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Sair">
-                <ActionIcon
-                  variant="subtle"
-                  color="red"
-                  size="sm"
-                  onClick={handleLogout}
-                  style={{
-                    backgroundColor: "#fef2f2",
-                    color: "#dc2626",
-                  }}
-                >
-                  <IconLogout size={16} />
-                </ActionIcon>
-              </Tooltip>
-            </Group>
+            <Tooltip label="Trocar Perfil">
+              <ActionIcon
+                variant="subtle"
+                color="green"
+                size="sm"
+                style={{
+                  backgroundColor: "#f0fdf4",
+                  color: "#16a34a",
+                }}
+              >
+                <IconSwitchHorizontal size={16} />
+              </ActionIcon>
+            </Tooltip>
           </Group>
+
+          {/* Profile Switcher */}
+          <Box mt="sm">
+            <Text size="xs" c="#9ca3af" mb="xs">
+              Trocar Perfil (Para Testes)
+            </Text>
+            <Select
+              size="xs"
+              value={userType}
+              onChange={handleProfileSwitch}
+              data={[
+                { value: "admin", label: "👨‍💼 Administrador" },
+                { value: "motorista", label: "🚗 Motorista" },
+                { value: "aluno", label: "🎓 Aluno" },
+              ]}
+              styles={{
+                input: {
+                  fontSize: "11px",
+                  height: "28px",
+                  backgroundColor: "#f8fffe",
+                  border: "1px solid #22c55e",
+                },
+              }}
+            />
+          </Box>
         </Box>
       </Box>
     </Paper>
