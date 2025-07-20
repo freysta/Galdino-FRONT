@@ -29,7 +29,11 @@ import {
 import { useDisclosure } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 
-import { usePayments, useCurrentUser, type Payment } from "@/hooks/useApi";
+import {
+  useStudentPayments,
+  useCurrentUser,
+  type Payment,
+} from "@/hooks/useApi";
 
 export default function AlunoPagamentosPage() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -42,7 +46,7 @@ export default function AlunoPagamentosPage() {
     data: paymentsData = [],
     isLoading,
     error,
-  } = usePayments(currentUser?.id, statusFilter || undefined);
+  } = useStudentPayments(currentUser?.id);
 
   // Garantir que é um array
   const payments = Array.isArray(paymentsData) ? paymentsData : [];
@@ -254,7 +258,7 @@ export default function AlunoPagamentosPage() {
                   <Table.Td>
                     <Text size="sm">
                       {payment.status === "Pago"
-                        ? payment.paymentMethod || "N/A"
+                        ? String(payment.paymentMethod || "N/A")
                         : "-"}
                     </Text>
                   </Table.Td>
@@ -391,7 +395,7 @@ export default function AlunoPagamentosPage() {
                   <Group gap="xs">
                     <IconCreditCard size="1rem" />
                     <Text fw={500}>
-                      {selectedPayment.paymentMethod || "N/A"}
+                      {String(selectedPayment.paymentMethod || "N/A")}
                     </Text>
                   </Group>
                 </div>

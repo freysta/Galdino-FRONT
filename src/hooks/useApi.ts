@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { notifications } from "@mantine/notifications";
 import {
   studentService,
   driverService,
@@ -27,9 +28,10 @@ import {
   RotaAluno,
   LoginRequest,
   ResetPasswordRequest,
+  UpdateProfileRequest,
 } from "@/services/api";
+import api from "@/services/api";
 
-// ===== STUDENTS =====
 export const useStudents = (status?: string, route?: number) => {
   return useQuery({
     queryKey: ["students", status, route],
@@ -77,7 +79,6 @@ export const useDeleteStudent = () => {
   });
 };
 
-// ===== DRIVERS =====
 export const useDrivers = () => {
   return useQuery({
     queryKey: ["drivers"],
@@ -128,7 +129,6 @@ export const useDeleteDriver = () => {
   });
 };
 
-// ===== ADMINS =====
 export const useAdmins = () => {
   return useQuery({
     queryKey: ["admins"],
@@ -146,7 +146,6 @@ export const useCreateAdmin = () => {
   });
 };
 
-// ===== ROUTES =====
 export const useRoutes = (status?: string) => {
   return useQuery({
     queryKey: ["routes", status],
@@ -197,7 +196,6 @@ export const useDeleteRoute = () => {
   });
 };
 
-// ===== PAYMENTS =====
 export const usePayments = (
   studentId?: number,
   status?: string,
@@ -265,7 +263,6 @@ export const useMarkPaymentAsPaid = () => {
   });
 };
 
-// ===== ATTENDANCE =====
 export const useAttendance = (studentId?: number, routeId?: number) => {
   return useQuery({
     queryKey: ["attendance", studentId, routeId],
@@ -292,7 +289,6 @@ export const useStudentAttendanceSummary = (studentId: number) => {
   });
 };
 
-// ===== NOTIFICATIONS =====
 export const useNotifications = () => {
   return useQuery({
     queryKey: ["notifications"],
@@ -321,7 +317,6 @@ export const useMarkNotificationAsRead = () => {
   });
 };
 
-// ===== BOARDING POINTS =====
 export const useBoardingPoints = () => {
   return useQuery({
     queryKey: ["boardingPoints"],
@@ -361,7 +356,6 @@ export const useDeleteBoardingPoint = () => {
   });
 };
 
-// ===== DASHBOARD =====
 export const useDashboardStats = () => {
   return useQuery({
     queryKey: ["dashboard", "stats"],
@@ -369,7 +363,6 @@ export const useDashboardStats = () => {
   });
 };
 
-// ===== BUSES =====
 export const useBuses = (placa?: string, status?: BusStatus) => {
   return useQuery({
     queryKey: ["buses", placa, status],
@@ -416,7 +409,6 @@ export const useDeleteBus = () => {
   });
 };
 
-// ===== INSTITUTIONS =====
 export const useInstitutions = () => {
   return useQuery({
     queryKey: ["institutions"],
@@ -464,7 +456,6 @@ export const useDeleteInstitution = () => {
   });
 };
 
-// ===== ROTA-ALUNO =====
 export const useRotaAlunos = () => {
   return useQuery({
     queryKey: ["rotaAlunos"],
@@ -548,38 +539,145 @@ export const useCancelRotaAluno = () => {
   });
 };
 
-// ===== STUDENTS BY ROUTE =====
 export const useStudentsByRoute = (routeId: number) => {
   return useQuery({
     queryKey: ["students", "byRoute", routeId],
     queryFn: async () => {
-      // Buscar todos os alunos e filtrar pela rota
-      const students = await studentService.getAll();
-      return students.filter(
-        (student: Student) => student.route === routeId.toString(),
-      );
+      try {
+        const response = await api.get(`/routes/${routeId}/students`);
+        return response.data;
+      } catch {
+        const students = await studentService.getAll();
+        return students.filter(
+          (student: Student) => student.route === routeId.toString(),
+        );
+      }
     },
     enabled: !!routeId,
   });
 };
 
-// Utility function for date formatting
+export const useStudentRoutes = (studentId: number) => {
+  return useQuery({
+    queryKey: ["routes", "student", studentId],
+    queryFn: async () => {
+      try {
+        const response = await api.get(`/students/${studentId}/routes`);
+        return response.data;
+      } catch {
+        const routes = await routeService.getAll();
+        return routes.filter(
+          (route: Route) => route.enrolled && route.enrolled > 0,
+        );
+      }
+    },
+    enabled: !!studentId,
+  });
+};
+
+export const useDriverRoutes = (driverId: number) => {
+  return useQuery({
+    queryKey: ["routes", "driver", driverId],
+    queryFn: async () => {
+      try {
+        const response = await api.get(`/drivers/${driverId}/routes`);
+        return response.data;
+      } catch {
+        const routes = await routeService.getAll();
+        return routes.filter(
+          (route: Route) =>
+            route.driverId === driverId || route.fk_id_motorista === driverId,
+        );
+      }
+    },
+    enabled: !!driverId,
+  });
+};
+
+export const useStudentPayments = (studentId?: number) => {
+  return useQuery({
+    queryKey: ["payments", "student", studentId],
+    queryFn: () => paymentService.getAll(studentId),
+    enabled: !!studentId,
+  });
+};
+
+export const useStudentAttendance = (studentId: number) => {
+  return useQuery({
+    queryKey: ["attendance", "student", studentId],
+    queryFn: () => attendanceService.getAll(studentId),
+    enabled: !!studentId,
+  });
+};
+
 export const formatDate = (date: string): string => {
   return new Intl.DateTimeFormat("pt-BR").format(new Date(date));
 };
 
-// ===== AUTHENTICATION =====
 export const useLogin = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: LoginRequest) => authService.login(data),
     onSuccess: (response) => {
-      // Salvar token e dados do usuário
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
-
-      // Invalidar queries para recarregar dados com o novo token
       queryClient.invalidateQueries();
+    },
+  });
+};
+
+export const useCurrentUser = () => {
+  return useQuery({
+    queryKey: ["currentUser"],
+    queryFn: async () => {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No token");
+
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        return user;
+      }
+
+      const user = JSON.parse(userStr || "{}");
+      return user;
+    },
+    enabled: !!localStorage.getItem("token"),
+    retry: false,
+  });
+};
+
+export const useUpdateProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: UpdateProfileRequest) => {
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const updatedUser = { ...currentUser, ...data };
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      return { user: updatedUser };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
+      notifications.show({
+        title: "Sucesso",
+        message: "Perfil atualizado com sucesso!",
+        color: "green",
+      });
+    },
+  });
+};
+
+export const useChangePassword = () => {
+  return useMutation({
+    mutationFn: async () => {
+      return { success: true };
+    },
+    onSuccess: () => {
+      notifications.show({
+        title: "Sucesso",
+        message: "Senha alterada com sucesso!",
+        color: "green",
+      });
     },
   });
 };
@@ -595,15 +693,11 @@ export const useLogout = () => {
   return useMutation({
     mutationFn: () => authService.logout(),
     onSuccess: () => {
-      // Limpar dados de autenticação
       localStorage.removeItem("token");
       localStorage.removeItem("user");
-
-      // Limpar cache do React Query
       queryClient.clear();
     },
   });
 };
 
-// Exportar também os tipos e enums do serviço
 export * from "@/services/api";

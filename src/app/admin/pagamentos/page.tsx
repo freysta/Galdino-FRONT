@@ -412,38 +412,82 @@ export default function PagamentosPage() {
                   <Table.Tr key={payment.id}>
                     <Table.Td>
                       <div>
-                        <Text fw={500}>
+                        <Text fw={500} size="sm">
                           {payment.studentId
                             ? getStudentName(payment.studentId)
                             : "Aluno não identificado"}
                         </Text>
                         <Text size="xs" c="dimmed">
-                          ID Pagamento: {payment.id || "N/A"} | ID Aluno:{" "}
-                          {payment.studentId || "N/A"}
+                          Matrícula: {payment.studentId || "N/A"}
                         </Text>
+                        {studentsArray.find((s) => s.id === payment.studentId)
+                          ?.course && (
+                          <Text size="xs" c="blue" mt="xs">
+                            {
+                              studentsArray.find(
+                                (s) => s.id === payment.studentId,
+                              )?.course
+                            }
+                          </Text>
+                        )}
                       </div>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="sm">
-                        {payment.monthLabel || payment.month}
-                      </Text>
+                      <div>
+                        <Text size="sm" fw={500}>
+                          {payment.monthLabel ||
+                            payment.month ||
+                            "Mês não informado"}
+                        </Text>
+                        {payment.year && (
+                          <Text size="xs" c="dimmed">
+                            Ano: {payment.year}
+                          </Text>
+                        )}
+                      </div>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="sm" fw={500}>
-                        R$ {(payment.amount || 0).toFixed(2)}
-                      </Text>
+                      <div>
+                        <Text
+                          size="sm"
+                          fw={700}
+                          c={payment.status === "Pago" ? "green" : "dark"}
+                        >
+                          R$ {(payment.amount || 0).toFixed(2)}
+                        </Text>
+                        {payment.status === "Atrasado" && (
+                          <Text size="xs" c="red">
+                            + juros aplicáveis
+                          </Text>
+                        )}
+                      </div>
                     </Table.Td>
                     <Table.Td>
                       <Badge
                         color={getStatusColor(payment.status)}
                         variant="light"
                         leftSection={getStatusIcon(payment.status)}
+                        size="md"
                       >
                         {getStatusLabel(payment.status)}
                       </Badge>
                     </Table.Td>
                     <Table.Td>
-                      <Text size="sm">{payment.paymentMethod || "N/A"}</Text>
+                      <div>
+                        <Text
+                          size="sm"
+                          fw={payment.status === "Pago" ? 500 : 400}
+                        >
+                          {payment.paymentMethod || "Não informado"}
+                        </Text>
+                        {payment.paymentDate && (
+                          <Text size="xs" c="dimmed">
+                            {new Date(payment.paymentDate).toLocaleDateString(
+                              "pt-BR",
+                            )}
+                          </Text>
+                        )}
+                      </div>
                     </Table.Td>
                     <Table.Td>
                       <Menu shadow="md" width={200}>
@@ -528,7 +572,15 @@ export default function PagamentosPage() {
                   name="studentId"
                   data={studentsSelectData}
                   required
-                  defaultValue={editingPayment?.studentId?.toString()}
+                  value={editingPayment?.studentId?.toString() || ""}
+                  onChange={(value) => {
+                    if (editingPayment) {
+                      setEditingPayment({
+                        ...editingPayment,
+                        studentId: value ? parseInt(value) : 0,
+                      });
+                    }
+                  }}
                   searchable
                   disabled={studentsLoading}
                 />
@@ -547,7 +599,15 @@ export default function PagamentosPage() {
                     { value: "06/2024", label: "Junho 2024" },
                   ]}
                   required
-                  defaultValue={editingPayment?.month}
+                  value={editingPayment?.month || ""}
+                  onChange={(value) => {
+                    if (editingPayment) {
+                      setEditingPayment({
+                        ...editingPayment,
+                        month: value || "",
+                      });
+                    }
+                  }}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
@@ -558,7 +618,15 @@ export default function PagamentosPage() {
                   decimalScale={2}
                   fixedDecimalScale
                   required
-                  defaultValue={editingPayment?.amount}
+                  value={editingPayment?.amount || 0}
+                  onChange={(value) => {
+                    if (editingPayment) {
+                      setEditingPayment({
+                        ...editingPayment,
+                        amount: typeof value === "number" ? value : 0,
+                      });
+                    }
+                  }}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
@@ -572,7 +640,17 @@ export default function PagamentosPage() {
                     { value: "Atrasado", label: "Atrasado" },
                   ]}
                   required
-                  defaultValue={editingPayment?.status?.toString()}
+                  value={editingPayment?.status?.toString() || ""}
+                  onChange={(value) => {
+                    if (editingPayment) {
+                      setEditingPayment({
+                        ...editingPayment,
+                        status:
+                          (value as "Pago" | "Pendente" | "Atrasado") ||
+                          "Pendente",
+                      });
+                    }
+                  }}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
@@ -586,7 +664,19 @@ export default function PagamentosPage() {
                     { value: "Pix", label: "PIX" },
                     { value: "Transferencia", label: "Transferência" },
                   ]}
-                  defaultValue={editingPayment?.paymentMethod}
+                  value={editingPayment?.paymentMethod || ""}
+                  onChange={(value) => {
+                    if (editingPayment) {
+                      setEditingPayment({
+                        ...editingPayment,
+                        paymentMethod: value as
+                          | "Dinheiro"
+                          | "CartaoCredito"
+                          | "Pix"
+                          | "Transferencia",
+                      });
+                    }
+                  }}
                 />
               </Grid.Col>
             </Grid>

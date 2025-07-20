@@ -39,8 +39,11 @@ import {
   useCreateRoute,
   useUpdateRoute,
   useDeleteRoute,
+  useDrivers,
+  useBuses,
+  useInstitutions,
 } from "@/hooks/useApi";
-import { Route } from "@/services/api";
+import { Route, Driver, Bus, Institution } from "@/services/api";
 
 interface RouteForm {
   name?: string;
@@ -77,22 +80,47 @@ export default function RotasPage() {
 
   // Usar React Query hooks
   const { data: routes = [], isLoading, error } = useRoutes();
+  const { data: drivers = [], isLoading: driversLoading } = useDrivers();
+  const { data: buses = [], isLoading: busesLoading } = useBuses();
+  const { data: institutions = [], isLoading: institutionsLoading } =
+    useInstitutions();
   const createRouteMutation = useCreateRoute();
   const updateRouteMutation = useUpdateRoute();
   const deleteRouteMutation = useDeleteRoute();
 
-  // Garantir que routes é um array
+  // Garantir que todos são arrays
   const routesArray = Array.isArray(routes) ? routes : [];
+  const driversArray = Array.isArray(drivers) ? drivers : [];
+  const busesArray = Array.isArray(buses) ? buses : [];
+  const institutionsArray = Array.isArray(institutions) ? institutions : [];
+
+  // Preparar dados para selects
+  const driversSelectData = driversArray.map((driver: Driver) => ({
+    value: driver.id?.toString() || "",
+    label: driver.name || `Motorista #${driver.id}`,
+  }));
+
+  const busesSelectData = busesArray.map((bus: Bus) => ({
+    value: bus.id?.toString() || "",
+    label: `${bus.modelo} - ${bus.placa}` || `Ônibus #${bus.id}`,
+  }));
+
+  const institutionsSelectData = institutionsArray.map(
+    (institution: Institution) => ({
+      value: institution.id?.toString() || "",
+      label: institution.nome || `Instituição #${institution.id}`,
+    }),
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "scheduled":
-        return "blue";
-      case "in_progress":
+      case "Planejada":
         return "orange";
-      case "completed":
+      case "EmAndamento":
+        return "blue";
+      case "Concluida":
         return "green";
-      case "cancelled":
+      case "Cancelada":
         return "red";
       default:
         return "gray";
@@ -101,16 +129,16 @@ export default function RotasPage() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "scheduled":
-        return "Agendada";
-      case "in_progress":
-        return "Em andamento";
-      case "completed":
+      case "Planejada":
+        return "Planejada";
+      case "EmAndamento":
+        return "Em Andamento";
+      case "Concluida":
         return "Concluída";
-      case "cancelled":
+      case "Cancelada":
         return "Cancelada";
       default:
-        return "Desconhecido";
+        return status || "Desconhecido";
     }
   };
 
@@ -193,17 +221,26 @@ export default function RotasPage() {
     }
 
     try {
-      // Estrutura correta para a API
+      // Usar estrutura original da API que funciona
       const routeData = {
         date: formData.date || new Date().toISOString().split("T")[0],
         destination: formData.destination as "Ida" | "Volta" | "Circular",
         departureTime: formData.departureTime,
-        status: formData.status as
-          | "Planejada"
-          | "EmAndamento"
-          | "Concluida"
-          | "Cancelada",
-        driverId: 1, // ID padrão do motorista
+        status: (() => {
+          switch (formData.status) {
+            case "scheduled":
+              return "Planejada";
+            case "in_progress":
+              return "EmAndamento";
+            case "completed":
+              return "Concluida";
+            case "cancelled":
+              return "Cancelada";
+            default:
+              return "Planejada";
+          }
+        })() as "Planejada" | "EmAndamento" | "Concluida" | "Cancelada",
+        driverId: parseInt(formData.driver || "1"),
       };
 
       if (editingRoute?.id) {
@@ -226,6 +263,13 @@ export default function RotasPage() {
       }
       close();
       setEditingRoute(null);
+      // Resetar formData após salvar
+      setFormData({
+        destination: "",
+        origin: "",
+        departureTime: "",
+        status: "scheduled",
+      });
     } catch (error) {
       console.error("Erro ao salvar rota:", error);
       notifications.show({
@@ -298,10 +342,10 @@ export default function RotasPage() {
             <Select
               placeholder="Status"
               data={[
-                { value: "scheduled", label: "Agendada" },
-                { value: "in_progress", label: "Em andamento" },
-                { value: "completed", label: "Concluída" },
-                { value: "cancelled", label: "Cancelada" },
+                { value: "Planejada", label: "Planejada" },
+                { value: "EmAndamento", label: "Em Andamento" },
+                { value: "Concluida", label: "Concluída" },
+                { value: "Cancelada", label: "Cancelada" },
               ]}
               value={statusFilter}
               onChange={setStatusFilter}
@@ -342,61 +386,110 @@ export default function RotasPage() {
                   <Table.Tr key={route.id}>
                     <Table.Td>
                       <div>
-                        <Text fw={500}>
-                          {route.destination || route.name || "Sem nome"}
+                        <Text fw={500} size="sm">
+                          Rota {route.destination || route.tipo_rota || "Ida"}
                         </Text>
                         <Group gap="xs" mt="xs">
-                          <IconMapPin size="0.8rem" />
+                          <IconMapPin size="0.8rem" color="gray" />
                           <Text size="xs" c="dimmed">
-                            De: {route.origin || "N/A"}
+                            {route.destination === "Ida"
+                              ? "Campus → Cidade"
+                              : route.destination === "Volta"
+                                ? "Cidade → Campus"
+                                : route.destination === "Circular"
+                                  ? "Rota Circular"
+                                  : "Trajeto"}
                           </Text>
                         </Group>
-                        <Text size="xs" c="dimmed">
-                          R$ {route.price ? route.price.toFixed(2) : "0.00"}
-                        </Text>
+                        {route.observacoes && (
+                          <Text size="xs" c="blue" mt="xs">
+                            {route.observacoes}
+                          </Text>
+                        )}
                       </div>
                     </Table.Td>
                     <Table.Td>
                       <Stack gap="xs">
-                        <Text size="sm">
-                          {route.date
-                            ? new Date(route.date).toLocaleDateString("pt-BR")
-                            : "N/A"}
+                        <Text size="sm" fw={500}>
+                          {(() => {
+                            const dateValue = route.date || route.data_rota;
+                            if (dateValue) {
+                              return new Date(dateValue).toLocaleDateString(
+                                "pt-BR",
+                              );
+                            }
+                            return new Date().toLocaleDateString("pt-BR");
+                          })()}
                         </Text>
                         <Group gap="xs">
-                          <IconClock size="0.8rem" />
-                          <Text size="sm">
-                            {route.time || route.departureTime || "N/A"}
+                          <IconClock size="0.8rem" color="blue" />
+                          <Text size="sm" c="blue">
+                            {route.departureTime ||
+                              route.horario_saida ||
+                              "08:00"}
                           </Text>
+                          {route.horario_chegada && (
+                            <>
+                              <Text size="xs" c="dimmed">
+                                →
+                              </Text>
+                              <Text size="sm" c="green">
+                                {route.horario_chegada}
+                              </Text>
+                            </>
+                          )}
                         </Group>
                       </Stack>
                     </Table.Td>
                     <Table.Td>
                       <div>
                         <Text size="sm" fw={500}>
-                          {route.driver || "Não atribuído"}
+                          {route.driverName ||
+                            driversArray.find(
+                              (d) =>
+                                d.id ===
+                                (route.driverId || route.fk_id_motorista),
+                            )?.name ||
+                            "Motorista não atribuído"}
                         </Text>
                         <Group gap="xs" mt="xs">
-                          <IconCar size="0.8rem" />
+                          <IconCar size="0.8rem" color="orange" />
                           <Text size="xs" c="dimmed">
-                            {route.vehicle || "Não atribuído"}
+                            {route.vehicle ||
+                              busesArray.find(
+                                (b) => b.id === route.fk_id_onibus,
+                              )?.modelo ||
+                              "Veículo não atribuído"}
                           </Text>
                         </Group>
+                        {route.km_percorrido && (
+                          <Text size="xs" c="dimmed" mt="xs">
+                            {route.km_percorrido} km
+                          </Text>
+                        )}
                       </div>
                     </Table.Td>
                     <Table.Td>
                       <Group gap="xs">
-                        <IconUsers size="0.8rem" />
+                        <IconUsers size="0.8rem" color="green" />
                         <Text size="sm">
-                          {route.enrolled || 0}/{route.capacity || 0}
+                          {route.enrolled || 0}/
+                          {route.capacity ||
+                            busesArray.find((b) => b.id === route.fk_id_onibus)
+                              ?.capacidade ||
+                            40}
                         </Text>
                       </Group>
                       <Text size="xs" c="dimmed">
-                        {route.capacity
-                          ? Math.round(
-                              ((route.enrolled || 0) / route.capacity) * 100,
-                            )
-                          : 0}
+                        {(() => {
+                          const capacity =
+                            route.capacity ||
+                            busesArray.find((b) => b.id === route.fk_id_onibus)
+                              ?.capacidade ||
+                            40;
+                          const enrolled = route.enrolled || 0;
+                          return Math.round((enrolled / capacity) * 100);
+                        })()}
                         % ocupado
                       </Text>
                     </Table.Td>
@@ -465,25 +558,33 @@ export default function RotasPage() {
           <Stack gap="md">
             <Grid>
               <Grid.Col span={12}>
-                <TextInput
-                  label="Destino"
-                  placeholder="Ex: Campus Norte - UNIFESP"
+                <Select
+                  label="Tipo de Rota"
+                  placeholder="Selecione o tipo"
                   required
+                  data={[
+                    { value: "Ida", label: "Ida" },
+                    { value: "Volta", label: "Volta" },
+                    { value: "Circular", label: "Circular" },
+                  ]}
                   value={formData.destination}
-                  onChange={(e) =>
-                    setFormData({ ...formData, destination: e.target.value })
+                  onChange={(value) =>
+                    setFormData({ ...formData, destination: value || "" })
                   }
                 />
               </Grid.Col>
               <Grid.Col span={12}>
-                <TextInput
-                  label="Origem"
-                  placeholder="Ex: Terminal Rodoviário"
+                <Select
+                  label="Instituição"
+                  placeholder="Selecione uma instituição"
                   required
+                  data={institutionsSelectData}
                   value={formData.origin}
-                  onChange={(e) =>
-                    setFormData({ ...formData, origin: e.target.value })
+                  onChange={(value) =>
+                    setFormData({ ...formData, origin: value || "" })
                   }
+                  searchable
+                  disabled={institutionsLoading}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
@@ -499,8 +600,9 @@ export default function RotasPage() {
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
                 <TextInput
-                  label="Horário de Partida"
+                  label="Horário de Saída"
                   placeholder="HH:MM"
+                  type="time"
                   required
                   value={formData.departureTime}
                   onChange={(e) =>
@@ -510,30 +612,49 @@ export default function RotasPage() {
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
                 <TextInput
+                  label="Horário de Chegada"
+                  placeholder="HH:MM"
+                  type="time"
+                  value={formData.time}
+                  onChange={(e) =>
+                    setFormData({ ...formData, time: e.target.value })
+                  }
+                />
+              </Grid.Col>
+              <Grid.Col span={{ base: 12, md: 6 }}>
+                <Select
                   label="Motorista"
-                  placeholder="Nome do motorista"
+                  placeholder="Selecione um motorista"
+                  required
+                  data={driversSelectData}
                   value={formData.driver}
-                  onChange={(e) =>
-                    setFormData({ ...formData, driver: e.target.value })
+                  onChange={(value) =>
+                    setFormData({ ...formData, driver: value || "" })
                   }
+                  searchable
+                  disabled={driversLoading}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
-                <TextInput
-                  label="Veículo"
-                  placeholder="Ex: Ônibus 001"
+                <Select
+                  label="Ônibus"
+                  placeholder="Selecione um ônibus"
+                  required
+                  data={busesSelectData}
                   value={formData.vehicle}
-                  onChange={(e) =>
-                    setFormData({ ...formData, vehicle: e.target.value })
+                  onChange={(value) =>
+                    setFormData({ ...formData, vehicle: value || "" })
                   }
+                  searchable
+                  disabled={busesLoading}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
                 <TextInput
-                  label="Preço (R$)"
-                  placeholder="15.00"
+                  label="KM Percorrido"
+                  placeholder="0"
                   type="number"
-                  step="0.01"
+                  step="0.1"
                   value={formData.price}
                   onChange={(e) =>
                     setFormData({
@@ -556,7 +677,7 @@ export default function RotasPage() {
                   required
                   value={formData.status}
                   onChange={(value) =>
-                    setFormData({ ...formData, status: value || "scheduled" })
+                    setFormData({ ...formData, status: value || "Planejada" })
                   }
                 />
               </Grid.Col>

@@ -36,8 +36,8 @@ import {
 
 import {
   useCurrentUser,
-  useRoutes,
-  useAttendance,
+  useStudentRoutes,
+  useStudentAttendance,
   useUpdateProfile,
   type Route,
   type Attendance,
@@ -54,10 +54,11 @@ export default function AlunoPerfilPage() {
     isLoading: userLoading,
     error: userError,
   } = useCurrentUser();
-  const { data: routes = [], isLoading: routesLoading } = useRoutes();
-  const { data: attendance = [], isLoading: attendanceLoading } = useAttendance(
-    currentUser?.id,
+  const { data: routes = [], isLoading: routesLoading } = useStudentRoutes(
+    currentUser?.id || 0,
   );
+  const { data: attendance = [], isLoading: attendanceLoading } =
+    useStudentAttendance(currentUser?.id || 0);
   const updateProfileMutation = useUpdateProfile();
 
   // Garantir que são arrays

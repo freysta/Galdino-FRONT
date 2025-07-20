@@ -8,7 +8,6 @@ import {
   Group,
   Stack,
   Card,
-  Badge,
   ActionIcon,
   Modal,
   Select,
@@ -29,7 +28,6 @@ import {
   IconDots,
   IconPhone,
   IconMail,
-  IconCar,
   IconAlertCircle,
 } from "@tabler/icons-react";
 import {
@@ -61,32 +59,6 @@ export default function MotoristasPage() {
 
   // Garantir que drivers é um array
   const driversArray = Array.isArray(drivers) ? drivers : [];
-
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "ativo":
-        return "green";
-      case "inativo":
-        return "red";
-      case "suspenso":
-        return "orange";
-      default:
-        return "gray";
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "ativo":
-        return "Ativo";
-      case "inativo":
-        return "Inativo";
-      case "suspenso":
-        return "Suspenso";
-      default:
-        return status || "Desconhecido";
-    }
-  };
 
   const filteredDrivers = driversArray.filter((driver: Driver) => {
     const matchesSearch =
@@ -253,8 +225,6 @@ export default function MotoristasPage() {
               <Table.Th>Motorista</Table.Th>
               <Table.Th>Contato</Table.Th>
               <Table.Th>CNH</Table.Th>
-              <Table.Th>Veículo</Table.Th>
-              <Table.Th>Status</Table.Th>
               <Table.Th>Ações</Table.Th>
             </Table.Tr>
           </Table.Thead>
@@ -310,20 +280,6 @@ export default function MotoristasPage() {
                     </div>
                   </Table.Td>
                   <Table.Td>
-                    <Group gap="xs">
-                      <IconCar size="0.8rem" />
-                      <Text size="sm">{driver.vehicle || "Não atribuído"}</Text>
-                    </Group>
-                  </Table.Td>
-                  <Table.Td>
-                    <Badge
-                      color={getStatusColor(driver.status)}
-                      variant="light"
-                    >
-                      {getStatusLabel(driver.status)}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td>
                     <Menu shadow="md" width={200}>
                       <Menu.Target>
                         <ActionIcon variant="subtle" color="gray">
@@ -355,7 +311,7 @@ export default function MotoristasPage() {
               ))
             ) : (
               <Table.Tr>
-                <Table.Td colSpan={6} style={{ textAlign: "center" }}>
+                <Table.Td colSpan={4} style={{ textAlign: "center" }}>
                   <Text c="dimmed">
                     {searchTerm || statusFilter
                       ? "Nenhum motorista encontrado"
@@ -445,10 +401,8 @@ function DriverModalComponent({
     phone: driver?.phone || "",
     cpf: driver?.cpf || "",
     cnh: driver?.cnh || "",
-    vehicle: driver?.vehicle || "",
     licenseExpiry: driver?.licenseExpiry || "",
     birthDate: driver?.birthDate || "",
-    status: driver?.status || "ativo",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -531,31 +485,6 @@ function DriverModalComponent({
               value={formData.licenseExpiry}
               onChange={(e) =>
                 setFormData({ ...formData, licenseExpiry: e.target.value })
-              }
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <TextInput
-              label="Veículo"
-              placeholder="Ex: Ônibus 001"
-              value={formData.vehicle}
-              onChange={(e) =>
-                setFormData({ ...formData, vehicle: e.target.value })
-              }
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            <Select
-              label="Status"
-              placeholder="Selecione o status"
-              data={[
-                { value: "ativo", label: "Ativo" },
-                { value: "inativo", label: "Inativo" },
-                { value: "suspenso", label: "Suspenso" },
-              ]}
-              value={formData.status}
-              onChange={(value) =>
-                setFormData({ ...formData, status: value || "ativo" })
               }
             />
           </Grid.Col>

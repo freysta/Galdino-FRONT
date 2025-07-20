@@ -30,8 +30,9 @@ import {
 } from "@tabler/icons-react";
 
 import {
-  useRoutes,
-  useStudents,
+  useCurrentUser,
+  useDriverRoutes,
+  useStudentsByRoute,
   useMarkAttendance,
   type Route,
   type Student,
@@ -47,16 +48,17 @@ export default function PresencasPage() {
   }>({});
 
   // Usar React Query hooks modernos
+  const { data: currentUser } = useCurrentUser();
   const {
     data: routes = [],
     isLoading: routesLoading,
     error: routesError,
-  } = useRoutes();
+  } = useDriverRoutes(currentUser?.id || 0);
   const {
     data: students = [],
     isLoading: studentsLoading,
     error: studentsError,
-  } = useStudents();
+  } = useStudentsByRoute(parseInt(selectedRoute) || 0);
   const markAttendanceMutation = useMarkAttendance();
 
   // Garantir que são arrays
@@ -65,15 +67,18 @@ export default function PresencasPage() {
 
   // Filtrar rotas ativas
   const activeRoutes = routesArray.filter(
-    (route: Route) => route.status === "Ativo" || route.status === "Agendada",
+    (route: Route) =>
+      route.status === "Ativo" ||
+      route.status === "Agendada" ||
+      route.status === "Planejada",
   );
 
   const selectedRouteData = activeRoutes.find(
     (r: Route) => r.id?.toString() === selectedRoute,
   );
 
-  // Filtrar alunos da rota selecionada (simulado - pode ser expandido com relação rota-aluno)
-  const routeStudents = studentsArray.slice(0, 10); // Limitando para exemplo
+  // Usar alunos da rota selecionada
+  const routeStudents = selectedRoute ? studentsArray : [];
 
   const handlePresenceChange = (
     studentId: number,

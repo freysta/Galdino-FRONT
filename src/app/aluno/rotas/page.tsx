@@ -27,7 +27,8 @@ import {
 } from "@tabler/icons-react";
 
 import {
-  useRoutes,
+  useCurrentUser,
+  useStudentRoutes,
   useDrivers,
   useBoardingPoints,
   type Route,
@@ -44,7 +45,10 @@ interface RouteStep {
 
 export default function AlunoRotasPage() {
   // Usar a API real com React Query
-  const { data: routes, isLoading: routesLoading } = useRoutes();
+  const { data: currentUser } = useCurrentUser();
+  const { data: routes, isLoading: routesLoading } = useStudentRoutes(
+    currentUser?.id || 0,
+  );
   const { data: drivers, isLoading: driversLoading } = useDrivers();
   const { data: boardingPoints, isLoading: boardingPointsLoading } =
     useBoardingPoints();
@@ -52,9 +56,13 @@ export default function AlunoRotasPage() {
   // Filtrar rotas ativas e futuras
   const today = new Date().toISOString().split("T")[0];
   const activeRoutes =
-    routes?.filter(
-      (route: Route) => route.status === "Ativo" || route.status === "Agendada",
-    ) || [];
+    routes?.filter((route: Route) => {
+      return (
+        route.status === "Planejada" ||
+        route.status === "EmAndamento" ||
+        route.status === "Concluida"
+      );
+    }) || [];
 
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(
     activeRoutes[0] || null,
@@ -89,9 +97,11 @@ export default function AlunoRotasPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Ativo":
+      case "Concluida":
         return "green";
-      case "Agendada":
+      case "EmAndamento":
+        return "blue";
+      case "Planejada":
         return "orange";
       case "Cancelada":
         return "red";
@@ -102,27 +112,31 @@ export default function AlunoRotasPage() {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case "Ativo":
-        return "Confirmada";
-      case "Agendada":
-        return "Agendada";
+      case "Planejada":
+        return "Planejada";
+      case "EmAndamento":
+        return "Em Andamento";
+      case "Concluida":
+        return "Concluída";
       case "Cancelada":
         return "Cancelada";
       default:
-        return status || "Desconhecido";
+        return status || "Pendente";
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "Ativo":
+      case "Concluida":
         return <IconCheck size="0.8rem" />;
-      case "Agendada":
+      case "Planejada":
         return <IconClock size="0.8rem" />;
+      case "EmAndamento":
+        return <IconCar size="0.8rem" />;
       case "Cancelada":
         return <IconAlertCircle size="0.8rem" />;
       default:
-        return null;
+        return <IconInfoCircle size="0.8rem" />;
     }
   };
 
@@ -435,7 +449,7 @@ export default function AlunoRotasPage() {
                   </>
                 )}
 
-                {selectedRoute.status === "Agendada" && (
+                {selectedRoute.status === "Planejada" && (
                   <Alert icon={<IconAlertCircle size="1rem" />} color="orange">
                     <Text size="sm">
                       Esta rota ainda não foi confirmada. Aguarde a confirmação

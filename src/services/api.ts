@@ -1,6 +1,5 @@
 import axios from "axios";
 
-// Configuração base da API - Corrigida para usar a API real
 const API_BASE_URL = "http://localhost:5064/api";
 
 const api = axios.create({
@@ -9,10 +8,6 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
 });
-
-// Interceptors removidos - sistema sem autenticação para testes
-
-// ===== INTERFACES CORRIGIDAS PARA ALINHAR COM A API =====
 
 export interface Institution {
   id?: number;
@@ -70,7 +65,7 @@ export interface Payment {
   studentName?: string;
   amount: number;
   month: string;
-  monthLabel?: string; // Para exibição formatada no frontend
+  monthLabel?: string;
   year?: number;
   status: "Pago" | "Pendente" | "Atrasado" | string | number;
   paymentMethod?: "Dinheiro" | "CartaoCredito" | "Pix" | "Transferencia";
@@ -80,13 +75,32 @@ export interface Payment {
 
 export interface Route {
   id?: number;
-  date: string;
-  destination: "Ida" | "Volta" | "Circular";
-  departureTime: string;
+  id_rota?: number;
+  data_rota?: string;
+  tipo_rota?: "Ida" | "Volta" | "Circular";
+  horario_saida?: string;
+  horario_chegada?: string;
+  km_percorrido?: number;
   status: "Planejada" | "EmAndamento" | "Concluida" | "Cancelada";
-  driverId: number;
-  driverName?: string; // Campo calculado no frontend
+  observacoes?: string;
+  fk_id_motorista?: number;
+  fk_id_onibus?: number;
+  fk_id_instituicao?: number;
+  date?: string;
+  destination?: "Ida" | "Volta" | "Circular";
+  departureTime?: string;
+  driverId?: number;
+  driverName?: string;
   createdAt?: string;
+  name?: string;
+  origin?: string;
+  time?: string;
+  driver?: string;
+  vehicle?: string;
+  price?: number;
+  capacity?: number;
+  enrolled?: number;
+  boardingPoints?: string[];
 }
 
 export interface Admin {
@@ -152,7 +166,6 @@ export interface RotaAluno {
   nomePonto?: string;
 }
 
-// ===== INTERFACES DE AUTENTICAÇÃO =====
 export interface LoginRequest {
   email: string;
   password: string;
@@ -186,8 +199,8 @@ export interface ForgotPasswordRequest {
 }
 
 export interface UpdateProfileRequest {
-  name: string;
-  email: string;
+  name?: string;
+  email?: string;
   phone?: string;
 }
 
@@ -196,7 +209,6 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
-// ===== INTERFACE PARA DASHBOARD =====
 export interface DashboardStats {
   totalStudents: number;
   totalDrivers: number;
@@ -207,9 +219,6 @@ export interface DashboardStats {
   lastUpdated: string;
 }
 
-// ===== SERVIÇOS CORRIGIDOS =====
-
-// 🔐 Autenticação - CORRIGIDO
 export const authService = {
   login: async (data: LoginRequest): Promise<LoginResponse> => {
     const response = await api.post("/auth/login", {
@@ -230,9 +239,20 @@ export const authService = {
     const response = await api.post("/auth/reset-password", data);
     return response.data;
   },
+  getCurrentUser: async () => {
+    const response = await api.get("/auth/current-user");
+    return response.data;
+  },
+  updateProfile: async (data: UpdateProfileRequest) => {
+    const response = await api.put("/auth/profile", data);
+    return response.data;
+  },
+  changePassword: async (data: ChangePasswordRequest) => {
+    const response = await api.put("/auth/change-password", data);
+    return response.data;
+  },
 };
 
-// 🏢 Instituições - CORRIGIDO
 export const institutionService = {
   getAll: async (nome?: string) => {
     const params = nome ? `?nome=${nome}` : "";
@@ -268,7 +288,6 @@ export const institutionService = {
   },
 };
 
-// 🚌 Ônibus - CORRIGIDO
 export const busService = {
   getAll: async (placa?: string, status?: string) => {
     const params = new URLSearchParams();
@@ -316,7 +335,6 @@ export const busService = {
   },
 };
 
-// 👥 Alunos - CORRIGIDO
 export const studentService = {
   getAll: async (status?: string, route?: number) => {
     const params = new URLSearchParams();
@@ -363,7 +381,6 @@ export const studentService = {
   },
 };
 
-// 🚗 Motoristas - CORRIGIDO
 export const driverService = {
   getAll: async () => {
     const response = await api.get("/drivers");
@@ -405,7 +422,6 @@ export const driverService = {
   },
 };
 
-// 💰 Pagamentos - CORRIGIDO PARA ALINHAR COM SCRIPT DE TESTE
 export const paymentService = {
   getAll: async (studentId?: number, status?: string, month?: string) => {
     const params = new URLSearchParams();
@@ -420,7 +436,6 @@ export const paymentService = {
     return response.data;
   },
   create: async (data: Payment) => {
-    // Estrutura exata esperada pelo script de teste
     const response = await api.post("/payments", {
       studentId: data.studentId,
       amount: data.amount,
@@ -449,7 +464,6 @@ export const paymentService = {
   },
 };
 
-// 🛣️ Rotas - CORRIGIDO
 export const routeService = {
   getAll: async (status?: string) => {
     const params = status ? `?status=${status}` : "";
@@ -462,21 +476,21 @@ export const routeService = {
   },
   create: async (data: Route) => {
     const response = await api.post("/routes", {
-      Date: data.date,
-      Destination: data.destination,
-      DepartureTime: data.departureTime,
+      Date: data.date || data.data_rota,
+      Destination: data.destination || data.tipo_rota,
+      DepartureTime: data.departureTime || data.horario_saida,
       Status: data.status,
-      DriverId: data.driverId,
+      DriverId: data.driverId || data.fk_id_motorista,
     });
     return response.data.data || response.data;
   },
   update: async (id: number, data: Partial<Route>) => {
     const response = await api.put(`/routes/${id}`, {
-      Date: data.date,
-      Destination: data.destination,
-      DepartureTime: data.departureTime,
+      Date: data.date || data.data_rota,
+      Destination: data.destination || data.tipo_rota,
+      DepartureTime: data.departureTime || data.horario_saida,
       Status: data.status,
-      DriverId: data.driverId,
+      DriverId: data.driverId || data.fk_id_motorista,
     });
     return response.data.data || response.data;
   },
@@ -485,7 +499,6 @@ export const routeService = {
   },
 };
 
-// 👨‍💼 Admin - CORRIGIDO
 export const adminService = {
   getAll: async () => {
     const response = await api.get("/admin/admins");
@@ -513,7 +526,6 @@ export const adminService = {
   },
 };
 
-// 📊 Dashboard - CORRIGIDO
 export const dashboardService = {
   getStats: async (): Promise<DashboardStats> => {
     const response = await api.get("/dashboard/stats");
@@ -521,7 +533,6 @@ export const dashboardService = {
   },
 };
 
-// ✅ Presença - CORRIGIDO (Rota corrigida)
 export const attendanceService = {
   getAll: async (studentId?: number, routeId?: number) => {
     const params = new URLSearchParams();
@@ -559,7 +570,6 @@ export const attendanceService = {
   },
 };
 
-// 📍 Pontos de Embarque - CORRIGIDO
 export const boardingPointService = {
   getAll: async () => {
     const response = await api.get("/boarding-points");
@@ -594,7 +604,6 @@ export const boardingPointService = {
   },
 };
 
-// 🔔 Notificações - CORRIGIDO
 export const notificationService = {
   getAll: async (type?: string, targetId?: number) => {
     const params = new URLSearchParams();
@@ -633,7 +642,6 @@ export const notificationService = {
   },
 };
 
-// 🔗 Rota-Aluno - CORRIGIDO (Rota corrigida)
 export const rotaAlunoService = {
   getAll: async () => {
     const response = await api.get("/rotaaluno");
@@ -682,7 +690,6 @@ export const rotaAlunoService = {
   },
 };
 
-// Exportar tipos e enums
 export type BusStatus = "Ativo" | "Manutenção" | "Inativo";
 export type RouteStatus =
   | "Planejada"
